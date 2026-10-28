@@ -1,82 +1,133 @@
 # Nightshift
 
-**A backup window planner for Veeam Backup & Replication.** Nightshift lays out every job's schedule on one timeline, together with the system jobs and background work that compete for the same proxies, repositories and gateways. It predicts how long each run takes from your real session history, works out how hard each server is loaded, and flags the nights where things collide. You can drag a job to a new start time and see the conflicts update right away, before you touch anything in VBR.
+**A backup window planner for Veeam Backup & Replication.** Nightshift puts every job on one timeline, next to the system jobs and background work that share your proxies, repositories and gateways. It predicts each run's length from your session history, adds up the load on every server, and marks the nights where jobs collide. Drag a job to a new start time and the conflicts update before you change anything in VBR.
 
 ![Nightshift timeline](docs/screenshot.png)
 
-> Community project. Not made, endorsed or supported by Veeam Software.
+> Community project. Veeam Software doesn't make, endorse or support it.
 
-   **[Try the live demo](https://falkobanaszak.github.io/nightshift/)** with sample data, nothing to install.
+**[Try the live demo](https://falkobanaszak.github.io/nightshift/)** with sample data, nothing to install.
 
 ## Why
 
-The VBR console shows each job's schedule only inside that job's settings, so nobody sees the whole night at once. Jobs pile up at 22:00, fulls land on the same Saturday, backup copies start before their source has finished, and the first sign of trouble is a job still running at 08:30. The VeeamHub Health Check shows concurrency from past sessions, and Veeam ONE has a schedule report. Nightshift is for the step before that, when you're planning a change.
+The VBR console shows a job's schedule inside that job's settings, one job at a time. You never see the whole night. Jobs pile up at 22:00, three fulls land on the same Saturday, a backup copy starts before its source finishes, and you find out when a job is still running at 08:30.
 
-## Quick start
+The VeeamHub Health Check shows concurrency from past sessions, and Veeam ONE has a schedule report. Use Nightshift before that, while you plan a change.
 
-1. **Export** your configuration on the VBR server (read-only, takes seconds to a few minutes).
+## How to use it
+
+You need two files from the [latest release](https://github.com/falkobanaszak/nightshift/releases/latest), the collector script `Collect-NightshiftData.ps1` and the planner `nightshift.html`.
+
+### 1. Export your configuration
+
+1. Copy `Collect-NightshiftData.ps1` to your VBR server.
+2. Right-click the file, open **Properties** and tick **Unblock** if Windows shows that option. Windows blocks scripts downloaded from the internet.
+3. Open PowerShell with an account that can log in to the VBR console, go to the folder with the script, and run this command.
 
    ```powershell
-   .\Collect-NightshiftData.ps1
+   .\Collect-NightshiftData.ps1 -ActivityFromRest -ReadHardware
    ```
 
-   For the v13 Linux appliance, or when you can't run scripts on the VBR server, use the REST API from any machine with PowerShell 7.
+   `-ActivityFromRest` adds background work such as retention and maintenance, and asks for your VBR login once. `-ReadHardware` reads CPU and RAM of your Windows servers. Leave both out for a quick first look.
+4. The script prints the name of the JSON file it wrote, for example `nightshift-VBR01-20261028-0930.json`. Copy that file to your laptop.
 
-   ```powershell
-   .\Collect-NightshiftData.ps1 -Mode Rest -Server vbr01.lab.local -SkipCertificateCheck
-   ```
+**v13 Linux appliance.** You can't run scripts on the appliance itself. Run the collector from any Windows, Mac or Linux machine with PowerShell 7 instead.
 
-2. **Open** `nightshift.html` in any browser. No install, no server, and it works offline.
-3. **Load** the JSON with *Open export* or drag the file onto the page.
+```powershell
+.\Collect-NightshiftData.ps1 -Mode Rest -Server vbr01.lab.local -SkipCertificateCheck
+```
 
-The page opens with a sample environment so you can try it before you export anything.
+**Sharing in a forum post.** Add `-Anonymize`. The script replaces every job, repository and server name with a neutral label.
+
+### 2. Load it into the planner
+
+1. Double-click `nightshift.html`. It opens in your browser and runs offline, nothing gets uploaded.
+2. Click **Open export** and pick your JSON file, or drag the file onto the page.
+
+The page opens with sample data, so you can explore it before you export anything.
+
+### 3. Read the summary
+
+The four tiles at the top answer four questions.
+
+- **Busiest server.** Which server works hardest, and how many cores it needs at peak. Click the tile to jump to that server.
+- **Conflicts.** How many problems Nightshift found, split into critical, warning and info.
+- **Busiest repository.** The highest number of parallel tasks against that repository's slot limit.
+- **Latest finish.** When the last backup of the night ends.
+
+### 4. Pick the time range
+
+Under **Show**, choose **1 night**, **1 day**, or 3, 7, 14 or 31 days. **1 night** runs from 12:00 to 12:00, so a backup window that crosses midnight stays in one piece. Use the arrows next to the date to step one day back or forward, and **Today** to come back.
+
+Switch from **Typical run** to **Slow night (p90)** to test against the slowest 10% of past runs.
+
+### 5. Work through the conflicts
+
+1. The **Conflicts** tab on the right lists every problem, critical first.
+2. Click one. The timeline jumps to the night it happens and highlights the jobs involved.
+3. Read the *Try* line under each conflict for a suggested fix.
+
+The blue bar above the timeline tells you what you're looking at. Click **Back to full view** or press **Esc** to clear it.
+
+### 6. Try a fix
+
+- **Drag a bar** sideways to move that job's start time. It snaps to 15 minutes and moves every run of the job.
+- **Click a job name** to change its start time, run days, full backup days or target repository.
+- **Click a repository name** to try a different task limit.
+- **Click a server name** to enter or change its cores and RAM.
+
+The conflicts and tiles recalculate after each change.
+
+### 7. Check the infrastructure
+
+Switch the row filter from **Everything** to **Infrastructure**. You now see three groups.
+
+- **Proxy pools and repositories** with their slot usage over time. Red means more tasks than slots.
+- **Servers** with the CPU need of all their Veeam roles together, so a server that is both proxy and repository shows the combined load.
+- **Background activity** with the hours retention, maintenance, malware scans and restores usually run, taken from your session history.
+
+### 8. Apply your changes in VBR
+
+1. Open the **Changes** tab. It lists everything you changed.
+2. Click **Copy as checklist** and paste it into your ticket or notes.
+3. Make the changes in the VBR console. Nightshift never writes to VBR.
+4. After a week, run the collector again and load the new export. Check that the conflicts are gone.
 
 ## What it flags
 
 | Conflict | Severity | What it means |
 |---|---|---|
 | Repository or proxy pool oversubscribed | Critical at 1.5x the limit, warning below | Jobs running at the same time want more task slots than the repository or proxies have, so some of them queue |
-| Runs past its backup window | Critical | The job is predicted to still be running when its window closes, and VBR can stop it there |
-| Backup copy starts before its source finishes | Critical | A periodic copy starts while the source job is still writing, so it picks up yesterday's restore point |
+| Runs past its backup window | Critical | Nightshift predicts the job still runs when its window closes, and VBR can stop it there |
+| Backup copy starts before its source finishes | Critical | A periodic copy starts while the source job still writes, so it copies yesterday's restore point |
 | Still running when the next run is due | Critical | A periodic or long job overlaps itself |
 | Scheduled outside its own window | Warning | The start time falls in hours the window blocks |
-| Runs into production hours | Warning (info for periodic jobs) | The job is still busy during the hours you set as business hours |
+| Runs into production hours | Warning (info for periodic and system jobs) | The job still runs during the hours you set as business hours |
 | Several fulls on one repository the same night | Warning at 3 or more, info at 2 | Active and synthetic fulls pile onto one night |
 | Server short on CPU or RAM | Critical at 1.5x, warning below | The roles on one server (proxy, repository, extent, gateway) need more cores or RAM than it has |
-| Busy hours overlap with background activity | Warning or info | Retention, repository maintenance, malware scans or restores usually run while a repository or server is near its limit |
-| Server hardware unknown | Info | Nightshift shows the peak need, enter the server's cores and RAM to check it |
-| No run history | Info | Durations are estimated from source size and throughput |
-
-Every conflict links to the night it happens. Click it and the timeline jumps there.
+| Busy hours overlap with background activity | Warning or info | Retention, maintenance, malware scans or restores usually run while a repository or server sits near its limit |
+| Server hardware unknown | Info | Nightshift shows the peak need. Enter the server's cores and RAM to check it |
+| No run history | Info | Nightshift estimates durations from source size and throughput |
 
 ## Infrastructure and background work
 
-Backup jobs aren't the only thing using your infrastructure at night. Nightshift adds three more layers.
+Backup jobs share your infrastructure with three other kinds of load, and Nightshift shows all three.
 
-**Servers.** Every server behind a proxy, repository, SOBR extent, gateway or mount server gets its own row. Its load is the sum of what its roles are doing at that moment. A server that is both a Hyper-V proxy and a SOBR extent shows both. CPU and RAM need come from the Veeam best practice guide rules, 1 core and 2 GB per proxy task, and 1 repository core per 3 tasks with 4 GB per repository core. Gateways count as repository tasks. All four numbers are adjustable under Assumptions. Tasks that are queued because a repository is full don't load the server, so the server view shows what can actually run.
+**Servers.** Every server behind a proxy, repository, SOBR extent, gateway or mount server gets its own row. Its load adds up what its roles do at that moment. CPU and RAM follow the Veeam best practice guide, 1 core and 2 GB per proxy task, and 1 repository core per 3 tasks with 4 GB per repository core. Gateways count as repository tasks. You can change all four numbers under **Assumptions**. Nightshift leaves out tasks that wait in a queue, because a waiting task uses no CPU.
 
-**System jobs.** The configuration backup, SOBR offload to the capacity tier (every 4 hours by default), SureBackup and tape jobs are planned like any other job and use slots on their repository. They're drawn in teal.
+**System jobs.** The configuration backup, SOBR offload to the capacity tier (every 4 hours by default), SureBackup and tape jobs take slots on their repository like any other job. Nightshift draws them in teal.
 
-**Observed background activity.** VBR starts some work on its own, so it can't be predicted from a schedule. Background retention, repository maintenance, malware detection, Security & Compliance Analyzer runs, restores and infrastructure rescans are read from the session history instead and shown as an hour-of-week profile, so you can see that maintenance usually lands on Saturday night before you put six fulls there too. This needs the REST API, so use `-Mode Rest`, or `-ActivityFromRest` with the default PowerShell mode.
-
-## Trying changes
-
-- **Drag a bar** sideways to move that job's start time. It snaps to 15 minutes and every run of the job moves with it.
-- **Click a job name** to edit start time, run days, active and synthetic full days, the target repository, or the planning assumptions for parallel tasks and duration.
-- **Click a repository header** to try a different concurrent task limit.
-- **Click a server** to enter or change its cores and RAM.
-- **Switch to Slow night (p90)** to test the plan against the slowest 10% of runs instead of a typical night.
-- **The Changes tab** lists everything you changed as a checklist you can copy into a ticket. Nightshift never writes to VBR.
+**Background activity.** VBR starts retention, repository maintenance, malware detection, Security & Compliance Analyzer runs, restores and rescans on its own, with no schedule to read. The collector reads them from the session history and the planner shows them as an hour-of-week pattern. You'll see that maintenance lands on Saturday night before you schedule six fulls there. This needs the REST API, so use `-Mode Rest`, or `-ActivityFromRest` in the default mode.
 
 ## How the prediction works
 
-- **Durations** come from the session history in the export. Typical uses the median, slow night uses the 90th percentile. Fulls and incrementals are measured separately where VBR records which was which.
-- **Synthetic fulls** add a transform step sized as a share of a full (35% by default). Health checks do the same (25% by default). Both are adjustable under Assumptions, because fast-clone repositories on XFS or ReFS need far less.
-- **Chained jobs** start when the job before them is predicted to end. Immediate backup copies start when each source run ends.
-- **Task slots** assume a job uses one slot per machine, capped at the repository limit. You can override that per job.
-- **Without history**, a full is estimated from source size at 250 MB/s and an incremental as 15% of that. Those runs are drawn with a dashed outline.
+- **Durations** come from the session history in the export. *Typical run* uses the median, *Slow night* the 90th percentile. Nightshift measures fulls and incrementals separately where VBR records which was which.
+- **Synthetic fulls** add a transform step at 35% of a full by default, health checks 25%. Lower both under **Assumptions** for fast-clone repositories on XFS or ReFS.
+- **Chained jobs** start when the job before them ends. Immediate backup copies start when each source run ends.
+- **Task slots.** Nightshift assumes one slot per machine, up to the repository limit. You can set a different value per job.
+- **No history yet?** Nightshift estimates a full from source size at 250 MB/s and an incremental at 15% of that, and draws those runs with a dashed outline.
 
-Nightshift doesn't model storage latency control, network throttling, retries or SOBR offload. A clean plan is likely to work, but it isn't a guarantee.
+Nightshift doesn't model storage latency control, network throttling or retries. Treat a clean plan as likely, with no guarantee.
 
 ## Collector reference
 
@@ -84,56 +135,56 @@ Nightshift doesn't model storage latency control, network throttling, retries or
 |---|---|---|
 | `-Mode` | `PowerShell` | `PowerShell` uses the Veeam cmdlets, `Rest` uses the REST API on port 9419 |
 | `-Server` | local | Required for `Rest` |
-| `-Credential` | current user | `Rest` prompts if you leave it out |
+| `-Credential` | current user | `Rest` asks for it if you leave it out |
 | `-HistoryDays` | `30` | How much session history to read |
 | `-OutFile` | `.\nightshift-<server>-<date>.json` | |
-| `-Anonymize` | off | Replaces names with labels and hashes ids, safe for forum posts |
-| `-ApiVersion` | `1.1-rev0` | REST header, raise it if your server rejects the default |
+| `-Anonymize` | off | Replaces names with labels and hashes ids for forum posts |
+| `-ApiVersion` | `1.1-rev0` | REST header. Raise it if your server rejects the default |
 | `-SkipCertificateCheck` | off | REST only, needs PowerShell 7 |
-| `-InvertWindow` | off | Flips how backup window hours are read, see below |
-| `-ActivityFromRest` | off | PowerShell mode only, also reads background sessions from the REST API |
-| `-ReadHardware` | off | Reads cores and RAM of Windows servers through CIM, read-only |
+| `-InvertWindow` | off | Flips how the script reads backup window hours, see known gaps |
+| `-ActivityFromRest` | off | Default mode only. Also reads background sessions from the REST API |
+| `-ReadHardware` | off | Reads cores and RAM of Windows servers through CIM |
 
-The collector only reads. Run it with an account that can open the VBR console. On large servers, reading sessions takes the longest, so lower `-HistoryDays` if it runs slowly.
+The collector only reads. On large servers the session history takes longest, so lower `-HistoryDays` if a run drags.
 
 ## Privacy
 
-The export holds job, repository, proxy and server names, schedules, run times and, with `-ReadHardware`, core and RAM counts. It holds no credentials, VM names or IP addresses. The viewer is one HTML file that reads the export in your browser and sends nothing anywhere. With `-Anonymize`, or *Hide names* in the viewer, you can share a timeline without exposing your naming scheme.
+The export holds job, repository, proxy and server names, schedules, run times and, with `-ReadHardware`, core and RAM counts. It holds no credentials, VM names or IP addresses. The planner reads the export in your browser and sends nothing anywhere. With `-Anonymize`, or **Hide names** in the planner, you can share a timeline and keep your naming scheme private.
 
 ## Status and known gaps
 
-This is version 0.1. The collector has been tested against fake Veeam objects and a mocked REST API (see `tests/`), not yet against a broad set of live servers. Reports from real environments are the most useful contribution right now. These are the places most likely to need a fix.
+This is version 0.1. I've tested the collector against fake Veeam objects and a mocked REST API (see `tests/`), and not yet against many live servers. Reports from real environments help most right now. Watch these spots.
 
-- **Backup window flags.** The PowerShell object model and the REST API encode allowed hours differently. If the hatched "outside backup window" areas show up exactly where your jobs are allowed to run, collect again with `-InvertWindow` and open an issue.
-- **Periodic schedules.** The collector reads the interval in minutes and guards against hours and seconds. Check that a job set to every 4 hours shows up as 240 minutes.
-- **Agent policies, file share jobs and tape** come through as far as the cmdlets expose their schedules. Agent jobs managed by policy may show as not scheduled.
-- **REST history** can't tell fulls from incrementals, so the collector treats unusually long runs as fulls.
-- **Gateway servers.** Where VBR picks gateways automatically, the export may not name them. Repository load then goes to the repository's own server. Linux server hardware isn't read, enter it in the planner.
-- **Background activity** is grouped by session type. Names of background operations vary between versions, so some may show up under a generic label.
+- **Backup window flags.** The PowerShell object model and the REST API store allowed hours in opposite ways. If the hatched "outside backup window" areas sit exactly where your jobs may run, collect again with `-InvertWindow` and open an issue.
+- **Periodic schedules.** Check that a job set to every 4 hours shows 240 minutes.
+- **Agent policies, file share jobs and tape** come through as far as the cmdlets expose their schedules. Policy-managed agent jobs may show as not scheduled.
+- **REST history** doesn't say which runs were fulls, so the collector treats unusually long runs as fulls.
+- **Gateway servers.** When VBR picks gateways on its own, the export may leave them out, and Nightshift puts the load on the repository's server. The collector doesn't read Linux hardware, so enter it in the planner.
+- **Background activity** names vary between VBR versions, so some sessions may land under a generic label.
 
 ## Roadmap
 
-- A *suggest a start time* button that finds the least busy slot for a job
-- Extra checks in the collector, such as the VBR server acting as a proxy
-- A per-night report you can attach to a change request
+- A *suggest a start time* button that finds the quietest slot for a job
+- Extra collector checks, such as the VBR server acting as a proxy
+- A per-night report to attach to a change request
 
 ## Repository layout
 
 ```
 collector/Collect-NightshiftData.ps1   the export script
-dist/nightshift.html                   the viewer, ready to open
-docs/index.html                        the same viewer, served by GitHub Pages as the live demo
-viewer/src/app.html                    viewer source
-viewer/build.py                        builds dist/ and embeds the sample
+dist/nightshift.html                   the planner, ready to open
+docs/index.html                        the same planner, served by GitHub Pages as the live demo
+viewer/src/app.html                    planner source
+viewer/build.py                        builds dist/ and docs/ and embeds the sample
 sample/                                sample export and its generator
 docs/schema.md                         export format
-tests/                                 collector tests (pwsh) and viewer tests (Playwright)
+tests/                                 collector tests (pwsh) and planner tests (Playwright)
 ```
 
 ## Contributing
 
-Issues and pull requests are welcome. If a schedule shows up wrong, the most helpful thing you can attach is an anonymized export (`-Anonymize`) and a note on what VBR shows for that job. Run `pwsh tests/Test-Collector.ps1` before you open a pull request that touches the collector. The viewer is edited in `viewer/src/app.html`, then `python3 viewer/build.py` writes `dist/nightshift.html` and the live demo copy in `docs/index.html`. Commit all three, the tests check that they match.
+Issues and pull requests are welcome. If a schedule looks wrong, attach an anonymized export (`-Anonymize`) and describe what VBR shows for that job. Run `pwsh tests/Test-Collector.ps1` before you open a pull request that touches the collector. To change the planner, edit `viewer/src/app.html` and run `python3 viewer/build.py`, which rewrites `dist/nightshift.html` and `docs/index.html`. Commit all three. The tests fail when they don't match.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Veeam and Veeam Backup & Replication are trademarks of Veeam Software. This project uses the names only to describe what it works with.
+MIT. See [LICENSE](LICENSE). Veeam and Veeam Backup & Replication are trademarks of Veeam Software. This project uses the names to describe what it works with.

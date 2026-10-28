@@ -123,6 +123,12 @@ button { cursor: pointer; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
 .seg button { border: 0; background: transparent; padding: 4px 10px; font-size: 12.5px; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.dnav { display: inline-flex; align-items: center; gap: 2px; }
+.dnav .btn { padding: 4px 9px; }
+.crumb { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; box-shadow: var(--shadow); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; padding: 7px 8px 7px 14px;
+  background: var(--accent-soft); border-radius: 10px; font-size: 13px; }
+.crumb b { font-weight: 600; }
+.crumb .btn { margin-left: auto; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12px; margin-left: auto; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .sw { width: 18px; height: 10px; border-radius: 3px; display: inline-block; }
@@ -300,9 +306,17 @@ textarea.out { width: 100%; min-height: 140px; font-family: var(--f-mono); font-
 <section class="summary" id="summary" aria-label="Summary"></section>
 
 <section class="controls" aria-label="View settings">
-  <label>From <input type="date" id="startDate"></label>
+  <div class="dnav">
+    <button class="btn ghost" type="button" id="dPrev" aria-label="Previous day">‹</button>
+    <label>From <input type="date" id="startDate"></label>
+    <button class="btn ghost" type="button" id="dNext" aria-label="Next day">›</button>
+    <button class="btn ghost" type="button" id="dToday">Today</button>
+  </div>
   <label>Show
     <select id="horizon">
+      <option value="night" title="12:00 to 12:00 the next day">1 night</option>
+      <option value="1">1 day</option>
+      <option value="3">3 days</option>
       <option value="7">7 days</option>
       <option value="14" selected>14 days</option>
       <option value="31">31 days</option>
@@ -340,6 +354,7 @@ textarea.out { width: 100%; min-height: 140px; font-family: var(--f-mono); font-
   </div>
 </section>
 
+<div class="crumb" id="crumb" hidden></div>
 <div class="main">
   <div class="panel tl-wrap">
     <div class="tl" id="tl" tabindex="0" aria-label="Job timeline"></div>
@@ -379,7 +394,7 @@ const SCHED_LABEL = { daily: "Daily", monthly: "Monthly", periodic: "Periodic", 
 const S = {
   data: null, orig: null, isSample: false,
   settings: {
-    start: null, horizon: 14, est: "median", group: "repo", view: "all", pxh: 16, anon: false, showOff: false,
+    start: null, horizon: 14, offset: 0, est: "median", group: "repo", view: "all", pxh: 16, anon: false, showOff: false,
     prod: { start: 480, end: 1080, days: DAYS.slice(0, 5) },
     throughput: 250, incPct: 15, synthPct: 35, healthPct: 25,
     proxyCores: 1, proxyRam: 2, repoTasksPerCore: 3, repoRamPerCore: 4,
@@ -460,7 +475,7 @@ function tasksFor(job, cap) {
 
 // ---------- simulation ----------
 function simulate() {
-  const st = S.settings, H = st.horizon, END = H * 1440, BEGIN = -1440;
+  const st = S.settings, H = st.horizon, V0 = st.offset || 0, END = V0 + H * 1440, BEGIN = V0 - 1440;
   const d0 = st.start.split("-").map(Number);
   T0 = Date.UTC(d0[0], d0[1] - 1, d0[2]);
   const jobs = S.data.jobs.filter(j => j.enabled !== false && j.scheduleEnabled !== false);
@@ -498,11 +513,11 @@ function simulate() {
     const list = [];
     if (sc.type === "daily") {
       const t = parseHM(sc.time);
-      if (t != null) for (let i = -1; i < H; i++) { const dt = dateOf(i); if ((sc.days || DAYS).includes(dayName(dt))) list.push(makeRun(job, i * 1440 + t, true)); }
+      if (t != null) for (let i = -1; i <= H; i++) { const dt = dateOf(i); if ((sc.days || DAYS).includes(dayName(dt))) list.push(makeRun(job, i * 1440 + t, true)); }
       add(job, list);
     } else if (sc.type === "monthly") {
       const t = parseHM((sc.monthly || {}).time || sc.time);
-      if (t != null) for (let i = -1; i < H; i++) { if (monthlyMatch(sc.monthly, dateOf(i))) list.push(makeRun(job, i * 1440 + t, true)); }
+      if (t != null) for (let i = -1; i <= H; i++) { if (monthlyMatch(sc.monthly, dateOf(i))) list.push(makeRun(job, i * 1440 + t, true)); }
       add(job, list);
     } else if (sc.type === "periodic") {
       const N = Math.max(5, +((sc.periodic || {}).everyMinutes) || 60), off = +((sc.periodic || {}).offsetMinutes) || 0;
@@ -592,7 +607,7 @@ function simulate() {
     // oversubscription occurrences
     const occ = [];
     for (const s of segs) {
-      if (s.d <= res.cap || s.runs.length < 2 || s.b <= 0 || s.a >= END) continue;
+      if (s.d <= res.cap || s.runs.length < 2 || s.b <= V0 || s.a >= END) continue;
       const last = occ[occ.length - 1];
       if (last && s.a <= last.end + 1) { last.end = s.b; last.peak = Math.max(last.peak, s.d); s.runs.forEach(r => last.runs.add(r)); }
       else occ.push({ start: s.a, end: s.b, peak: s.d, runs: new Set(s.runs) });
@@ -605,7 +620,7 @@ function simulate() {
       conflicts.push({
         id: "slots:" + res.key, type: "slots", sev: crit ? "crit" : "warn", resKey: res.key,
         title: `${res.label} ${res.pool ? "are" : "is"} oversubscribed`,
-        detail: `Up to ${worst.peak} parallel tasks against ${res.cap} slots, on ${days.size} of ${H} days. Jobs will queue and finish later than shown.`,
+        detail: `Up to ${worst.peak} parallel tasks against ${res.cap} slots, ${spanText(days.size, H)}. Jobs will queue and finish later than shown.`,
         fix: `stagger the start times of ${[...worst.runs].map(r => nm(jobById(r.jobId))).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).join(", ")}.`,
         occ: occ.map(o => ({ start: o.start, end: o.end, label: `${fmtAt(o.start)} · ${o.peak}/${res.cap}` })), focus: worst.start, jobIds: [...jobsIn],
       });
@@ -646,7 +661,7 @@ function simulate() {
       }
     }
     hostLoad.set(h.id, segs);
-    const vis = segs.filter(x => x.b > 0 && x.a < END);
+    const vis = segs.filter(x => x.b > V0 && x.a < END);
     if (!vis.length) continue;
     const pk = vis.reduce((m, x) => x.cores > m.cores ? x : m, vis[0]);
     const pkR = vis.reduce((m, x) => Math.max(m, x.ram), 0);
@@ -660,14 +675,14 @@ function simulate() {
       continue;
     }
     const occ = [];
-    for (const x of vis) { if (!over(x)) continue; const l = occ[occ.length - 1]; if (l && x.a <= l.end + 1) { l.end = x.b; l.c = Math.max(l.c, x.cores); l.r = Math.max(l.r, x.ram); } else occ.push({ start: Math.max(0, x.a), end: x.b, c: x.cores, r: x.ram }); }
+    for (const x of vis) { if (!over(x)) continue; const l = occ[occ.length - 1]; if (l && x.a <= l.end + 1) { l.end = x.b; l.c = Math.max(l.c, x.cores); l.r = Math.max(l.r, x.ram); } else occ.push({ start: Math.max(V0, x.a), end: x.b, c: x.cores, r: x.ram }); }
     if (occ.length) {
       const w = occ.reduce((a, b) => b.c > a.c ? b : a);
       const crit = (h.cores && w.c > h.cores * 1.5) || (h.ramGB && w.r > h.ramGB * 1.5);
       const days = new Set(occ.map(o => Math.floor(o.start / 1440)));
       conflicts.push({ id: "host:" + h.id, type: "host", sev: crit ? "crit" : "warn", jobIds: [], hostId: h.id,
         title: `${nm(h)} is short on CPU or RAM`,
-        detail: `Its roles (${roles}) need up to ${w.c.toFixed(1)} cores and ${Math.ceil(w.r)} GB RAM, against ${h.cores || "?"} cores and ${h.ramGB || "?"} GB, on ${days.size} of ${H} days. Tasks will run slower than their history.`,
+        detail: `Its roles (${roles}) need up to ${w.c.toFixed(1)} cores and ${Math.ceil(w.r)} GB RAM, against ${h.cores || "?"} cores and ${h.ramGB || "?"} GB, ${spanText(days.size, H)}. Tasks will run slower than their history.`,
         fix: "lower the task limit on this server's roles, move a role to another server, or add CPU and RAM.",
         occ: occ.map(o => ({ start: o.start, label: `${fmtAt(o.start)} · ${o.c.toFixed(1)}/${h.cores || "?"} cores` })), focus: w.start });
     }
@@ -686,12 +701,12 @@ function simulate() {
   for (const a of (S.data.activity || [])) {
     if (!Array.isArray(a.profile) || a.profile.length !== 168) continue;
     let hours = 0, peakV = 0; const names = new Set(), occ = [];
-    for (let d = 0; d < H; d++) {
-      const wd = DAYS.indexOf(dayName(dateOf(d)));
-      for (let h = 0; h < 24; h++) {
+    for (let t = Math.floor(V0 / 60) * 60; t < END; t += 60) {
+      {
+        const wd = DAYS.indexOf(dayName(dateOf(Math.floor(t / 1440)))), h = (((t % 1440) + 1440) % 1440) / 60;
         const v = a.profile[wd * 24 + h];
         if (v < 0.3) continue;
-        const t = d * 1440 + h * 60, b = busyAt(t, t + 60);
+        const b = busyAt(t, t + 60);
         if (b.size) { hours++; peakV = Math.max(peakV, v); b.forEach(n => names.add(n)); if (!occ.length || occ[occ.length - 1].start + 60 < t) occ.push({ start: t, label: fmtAt(t) }); }
       }
     }
@@ -709,7 +724,7 @@ function simulate() {
   const prod = st.prod;
   for (const job of jobs) {
     const runs = runsByJob.get(job.id) || [];
-    const vis = runs.filter(r => r.start >= 0 && r.start < END);
+    const vis = runs.filter(r => r.start >= V0 && r.start < END);
     const J = nm(job);
     // backup window exceeded
     if (job.schedule?.window?.enabled) {
@@ -723,7 +738,7 @@ function simulate() {
           fix: w.r.kind !== "inc" ? "move the full backup to a night with more room, or start earlier." : "start earlier or widen the window.",
           occ: hits.map(h => ({ start: h.r.start, label: fmtAt(h.r.start) })), focus: w.r.start });
       }
-      const bad = vis.filter(r => !allowedAt(job, r.start) && r.start >= 0);
+      const bad = vis.filter(r => !allowedAt(job, r.start));
       if (bad.length) {
         bad.forEach(r => r.flags.add("window"));
         conflicts.push({ id: "wstart:" + job.id, type: "wstart", sev: "warn", jobIds: [job.id],
@@ -742,7 +757,7 @@ function simulate() {
         const periodic = ["periodic", "continuous"].includes(job.schedule?.type) || isSys(job);
         conflicts.push({ id: "prod:" + job.id, type: "prod", sev: periodic ? "info" : "warn", jobIds: [job.id],
           title: `${J} runs into production hours`,
-          detail: isSys(job) ? `This system job runs ${hits.length} times during production hours over ${days.size} days. That's often fine, but it competes with restores and daytime jobs.` : periodic ? `This job runs every ${job.schedule.periodic?.everyMinutes || "few"} minutes, so ${hits.length} runs land in production hours on ${days.size} days. Fine if that is intended.`
+          detail: isSys(job) ? `This system job runs ${hits.length === 1 ? "once" : hits.length + " times"} during production hours${days.size > 1 ? ` over ${days.size} days` : ""}. That's often fine, but it competes with restores and daytime jobs.` : periodic ? `This job runs every ${job.schedule.periodic?.everyMinutes || "few"} minutes, so ${hits.length} run${hits.length > 1 ? "s" : ""} land in production hours${days.size > 1 ? ` on ${days.size} days` : ""}. Fine if that is intended.`
             : `Still running during production hours on ${days.size} day${days.size > 1 ? "s" : ""}. Worst case ${fmtAt(w.r.start)} ends ${hhmm(w.r.end)}.`,
           fix: periodic ? "add a backup window to keep it out of business hours." : (w.r.kind !== "inc" ? "move the full to a weekend night." : "start earlier."),
           occ: hits.map(h => ({ start: h.r.start, label: fmtAt(h.r.start) })), focus: w.r.start });
@@ -750,7 +765,7 @@ function simulate() {
     }
     // overlapping itself
     const self = [];
-    for (let i = 1; i < runs.length; i++) if (runs[i].start < runs[i - 1].end && runs[i].end > 0 && runs[i].start < END && !runs[i].src) { runs[i].flags.add("self"); self.push(runs[i]); }
+    for (let i = 1; i < runs.length; i++) if (runs[i].start < runs[i - 1].end && runs[i].end > V0 && runs[i].start < END && !runs[i].src) { runs[i].flags.add("self"); self.push(runs[i]); }
     if (self.length) conflicts.push({ id: "self:" + job.id, type: "self", sev: "crit", jobIds: [job.id],
       title: `${J} is still running when its next run is due`,
       detail: `${self.length} run${self.length > 1 ? "s start" : " starts"} before the previous one has finished. Veeam skips or delays the overlapping run.`,
@@ -782,7 +797,7 @@ function simulate() {
   for (const repo of S.data.repositories) {
     const byDay = new Map();
     for (const job of jobs.filter(j => j.repositoryId === repo.id)) for (const r of runsByJob.get(job.id) || []) {
-      if (r.kind === "inc" || r.start < 0 || r.start >= END) continue;
+      if (r.kind === "inc" || r.start < V0 || r.start >= END) continue;
       const di = Math.floor((r.start - 720) / 1440); // a "night" runs noon to noon
       if (!byDay.has(di)) byDay.set(di, []);
       byDay.get(di).push(r);
@@ -806,13 +821,13 @@ function simulate() {
   let busiest = null;
   for (const [key, p] of pressure) {
     if (!key.startsWith("repo:") || !p.cap) continue;
-    const pk = p.segs.filter(s => s.b > 0 && s.a < END).reduce((m, s) => Math.max(m, s.d), 0);
+    const pk = p.segs.filter(s => s.b > V0 && s.a < END).reduce((m, s) => Math.max(m, s.d), 0);
     const ratio = pk / p.cap;
     if (!busiest || ratio > busiest.ratio) busiest = { key, peak: pk, cap: p.cap, ratio, repo: repoById(key.slice(5)) };
   }
   let latest = null;
   for (const r of all) {
-    if (r.start < 0 || r.start >= END) continue;
+    if (r.start < V0 || r.start >= END) continue;
     const job = jobById(r.jobId); if (["periodic", "continuous"].includes(job.schedule?.type) || isSys(job)) continue;
     const night = Math.floor((r.start - 720) / 1440);
     const endRel = r.end - (night * 1440 + 720); // minutes after noon of night start
@@ -820,12 +835,12 @@ function simulate() {
   }
   let busiestHost = null;
   for (const h of (S.data.hosts || [])) {
-    const segs = (hostLoad.get(h.id) || []).filter(x => x.b > 0 && x.a < END);
+    const segs = (hostLoad.get(h.id) || []).filter(x => x.b > V0 && x.a < END);
     const pk = segs.reduce((m, x) => Math.max(m, x.cores), 0);
     const ratio = h.cores ? pk / h.cores : 0;
     if (pk && (!busiestHost || ratio > busiestHost.ratio || (!busiestHost.ratio && pk > busiestHost.peak))) busiestHost = { h, peak: pk, ratio };
   }
-  S.sim = { runsByJob, all, conflicts, pressure, resources, busiest, busiestHost, latest, END, hostLoad };
+  S.sim = { runsByJob, all, conflicts, pressure, resources, busiest, busiestHost, latest, END, V0, hostLoad };
 }
 
 function allowedAt(job, min) {
@@ -846,10 +861,12 @@ function prodOverlap(a, b) {
   for (let di = Math.floor(a / 1440); di <= Math.floor(b / 1440); di++) {
     if (!p.days.includes(dayName(dateOf(di)))) continue;
     const s = di * 1440 + p.start, e = di * 1440 + p.end;
-    if (a < e && b > s && di >= 0 && di < S.settings.horizon) return Math.max(a, s);
+    const v0 = S.settings.offset || 0, v1 = v0 + S.settings.horizon * 1440;
+    if (a < e && b > s && s < v1 && e > v0) return Math.max(a, s, v0);
   }
   return null;
 }
+function spanText(n, H) { return H <= 1 ? (S.settings.offset ? "during this night" : "on this day") : `on ${n} of ${H} days`; }
 function hostRoles(h) {
   const r = [];
   if (h.isBackupServer) r.push("backup server");
@@ -893,7 +910,7 @@ const tl = $("#tl"), pane = $("#pane"), tip = $("#tip");
 function rowsModel() {
   const st = S.settings;
   const jobs = S.data.jobs.filter(j => st.showOff || (j.enabled !== false && j.scheduleEnabled !== false));
-  const firstStart = j => { const r = (S.sim.runsByJob.get(j.id) || []).find(r => r.start >= 0); return r ? (r.start % 1440 + 1440 - 720) % 1440 : 99999; };
+  const firstStart = j => { const r = (S.sim.runsByJob.get(j.id) || []).find(r => r.start >= S.sim.V0); return r ? (r.start % 1440 + 1440 - 720) % 1440 : 99999; };
   const sortJobs = list => list.slice().sort((a, b) => firstStart(a) - firstStart(b) || a.name.localeCompare(b.name));
   const rows = [];
   if (st.group === "repo") {
@@ -964,11 +981,11 @@ function renderServer() {
 function renderSummary() {
   const sim = S.sim, c = sim.conflicts;
   const n = sev => c.filter(x => x.sev === sev).length;
-  const runs = sim.all.filter(r => r.start >= 0 && r.start < sim.END).length;
+  const runs = sim.all.filter(r => r.start >= sim.V0 && r.start < sim.END).length;
   const activeJobs = S.data.jobs.filter(j => j.enabled !== false).length;
   const b = sim.busiest, l = sim.latest;
   $("#summary").innerHTML = `
-    <div class="tile tap" id="tileHost" role="button" tabindex="0" title="Show servers"><div class="k">Busiest server</div>${sim.busiestHost ? `<div class="v">${sim.busiestHost.peak.toFixed(1)} <small>${sim.busiestHost.h.cores ? `of ${sim.busiestHost.h.cores} cores at peak` : "cores at peak"}</small></div><div class="s">${esc(nm(sim.busiestHost.h))} · ${runs.toLocaleString()} runs from ${activeJobs} jobs in view</div>` : `<div class="v">${runs.toLocaleString()} <small>runs</small></div><div class="s">${activeJobs} active jobs over ${S.settings.horizon} days</div>`}</div>
+    <div class="tile tap" id="tileHost" role="button" tabindex="0" title="Show servers, click again to go back"><div class="k">Busiest server</div>${sim.busiestHost ? `<div class="v">${sim.busiestHost.peak.toFixed(1)} <small>${sim.busiestHost.h.cores ? `of ${sim.busiestHost.h.cores} cores at peak` : "cores at peak"}</small></div><div class="s">${esc(nm(sim.busiestHost.h))} · ${runs.toLocaleString()} runs from ${activeJobs} jobs in view</div>` : `<div class="v">${runs.toLocaleString()} <small>runs</small></div><div class="s">${activeJobs} active jobs in view</div>`}</div>
     <div class="tile"><div class="k">Conflicts</div><div class="v">${n("crit") + n("warn")} <small>to fix</small></div>
       <div class="sev-row"><span class="sev crit">${n("crit")} critical</span><span class="sev warn">${n("warn")} warning</span><span class="sev info">${n("info")} info</span></div></div>
     <div class="tile"><div class="k">Busiest repository</div>${b ? `<div class="v">${b.peak} <small>of ${b.cap} slots at peak</small></div><div class="s">${esc(nm(b.repo))}</div>` : `<div class="v">None</div>`}</div>
@@ -978,6 +995,7 @@ function renderSummary() {
 function bindTiles() {
   const t = $("#tileHost"); if (!t || !S.sim.busiestHost) return;
   const go = () => {
+    if (S.settings.view === "infra" && S.selConf && S.selConf.startsWith("host:")) return resetView();
     setView("infra");
     const c = S.sim.conflicts.find(x => x.hostId === S.sim.busiestHost.h.id);
     if (c) { setTab("conf"); focusConflict(c.id); }
@@ -995,7 +1013,9 @@ function renderCounts() {
 
 function renderTimeline() {
   LABW = window.innerWidth < 600 ? 150 : 230;
-  const st = S.settings, px = st.pxh / 60, H = st.horizon, W = H * 1440 * px;
+  const st = S.settings, px = st.pxh / 60, H = st.horizon, W = H * 1440 * px, V0 = S.sim.V0, V1 = S.sim.END;
+  const X = t => (t - V0) * px, D0 = Math.floor(V0 / 1440), D1 = Math.ceil(V1 / 1440);
+  const clip = (a, b) => [Math.max(V0, a), Math.min(V1, b)];
   const rows = rowsModel();
   const keepX = tl.scrollLeft, keepY = tl.scrollTop;
   const selConf = S.selConf ? S.sim.conflicts.find(c => c.id === S.selConf) : null;
@@ -1005,20 +1025,22 @@ function renderTimeline() {
   // axis
   let ax = `<div class="row axis"><div class="lab">${st.est === "p90" ? "Slow night (p90)" : "Typical run"} · server time</div><div class="track" style="width:${W}px">`;
   const step = st.pxh >= 40 ? 2 : st.pxh >= 16 ? 6 : 12;
-  for (let d = 0; d < H; d++) {
+  for (let d = D0; d < D1; d++) {
     const dt = dateOf(d), we = ["Saturday", "Sunday"].includes(dayName(dt));
-    ax += `<div class="day${we ? " we" : ""}" style="left:${d * 1440 * px}px;width:${1440 * px}px">${st.pxh >= 8 ? fmtDay(d) : ""}</div>`;
-    for (let h = step; h < 24; h += step) ax += `<div class="hr" style="left:${(d * 1440 + h * 60) * px}px">${pad(h)}</div>`;
+    const [a, b] = clip(d * 1440, (d + 1) * 1440);
+    ax += `<div class="day${we ? " we" : ""}" style="left:${X(a)}px;width:${(b - a) * px}px">${st.pxh >= 8 && (b - a) * px > 60 ? fmtDay(d) : ""}</div>`;
+    for (let h = 0; h < 24; h += step) { const t = d * 1440 + h * 60; if (t > V0 && t < V1 && (h || t !== a)) ax += `<div class="hr" style="left:${X(t)}px">${pad(h)}</div>`; }
   }
   ax += `</div></div>`;
   parts.push(ax);
   // background layer
   let bg = `<div class="bg" style="left:${LABW}px;top:42px;width:${W}px;bottom:0;background-image:repeating-linear-gradient(to right, var(--grid) 0 1px, transparent 1px ${st.pxh * step}px)">`;
-  for (let d = 0; d < H; d++) {
+  for (let d = D0; d < D1; d++) {
     const dt = dateOf(d), dn = dayName(dt);
-    if (dn === "Saturday" || dn === "Sunday") bg += `<div class="we" style="left:${d * 1440 * px}px;width:${1440 * px}px"></div>`;
-    if (st.prod.days.includes(dn) && st.prod.end > st.prod.start) bg += `<div class="prod" style="left:${(d * 1440 + st.prod.start) * px}px;width:${(st.prod.end - st.prod.start) * px}px"></div>`;
-    bg += `<div class="dcol" style="left:${d * 1440 * px}px"></div>`;
+    const [a, b] = clip(d * 1440, (d + 1) * 1440);
+    if (dn === "Saturday" || dn === "Sunday") bg += `<div class="we" style="left:${X(a)}px;width:${(b - a) * px}px"></div>`;
+    if (st.prod.days.includes(dn) && st.prod.end > st.prod.start) { const [pa, pb] = clip(d * 1440 + st.prod.start, d * 1440 + st.prod.end); if (pb > pa) bg += `<div class="prod" style="left:${X(pa)}px;width:${(pb - pa) * px}px"></div>`; }
+    if (d * 1440 > V0) bg += `<div class="dcol" style="left:${X(d * 1440)}px"></div>`;
   }
   bg += `</div>`;
   parts.push(bg);
@@ -1034,10 +1056,10 @@ function renderTimeline() {
       const peak = segs.reduce((m, x) => Math.max(m, x.cores), 0) || 1;
       let hh = `<div class="heat" style="left:0;right:0">`;
       for (const x of segs) {
-        if (x.b <= 0 || x.a >= H * 1440) continue;
+        if (x.b <= V0 || x.a >= V1) continue;
         const r = h.cores ? x.cores / h.cores : x.cores / peak * 0.6, lv = r > 1 ? 3 : r > 0.6 ? 2 : 1;
-        const a = Math.max(0, x.a), b = Math.min(H * 1440, x.b);
-        hh += `<i class="l${lv}" style="left:${a * px}px;width:${Math.max(1, (b - a) * px)}px" title="${x.cores.toFixed(1)} cores, ${Math.ceil(x.ram)} GB (${x.pt.toFixed(1)} proxy and ${x.rt.toFixed(1)} repository tasks)"></i>`;
+        const [a, b] = clip(x.a, x.b);
+        hh += `<i class="l${lv}" style="left:${X(a)}px;width:${Math.max(1, (b - a) * px)}px" title="${x.cores.toFixed(1)} cores, ${Math.ceil(x.ram)} GB (${x.pt.toFixed(1)} proxy and ${x.rt.toFixed(1)} repository tasks)"></i>`;
       }
       hh += `</div>`;
       const hw = h.cores || h.ramGB ? `${h.cores || "?"} cores · ${h.ramGB || "?"} GB` : "hardware unknown";
@@ -1045,11 +1067,12 @@ function renderTimeline() {
     } else if (row.kind === "act") {
       const a = row.act, mx = Math.max(...a.profile) || 1;
       let hh = `<div class="heat" style="left:0;right:0">`;
-      for (let d = 0; d < H; d++) {
-        const wd = DAYS.indexOf(dayName(dateOf(d)));
-        for (let h = 0; h < 24; h++) {
+      for (let t = Math.floor(V0 / 60) * 60; t < V1; t += 60) {
+        const d = Math.floor(t / 1440), h = (((t % 1440) + 1440) % 1440) / 60, wd = DAYS.indexOf(dayName(dateOf(d)));
+        {
           const v = a.profile[wd * 24 + h]; if (!(v > 0)) continue;
-          hh += `<i class="a" style="left:${(d * 1440 + h * 60) * px}px;width:${60 * px}px;opacity:${(0.2 + 0.8 * Math.min(1, v / mx)).toFixed(2)}" title="${fmtDay(d)} ${pad(h)}:00 · on average ${v.toFixed(1)} running"></i>`;
+          const [ca, cb] = clip(t, t + 60);
+          hh += `<i class="a" style="left:${X(ca)}px;width:${(cb - ca) * px}px;opacity:${(0.2 + 0.8 * Math.min(1, v / mx)).toFixed(2)}" title="${fmtDay(d)} ${pad(h)}:00 · on average ${v.toFixed(1)} running"></i>`;
         }
       }
       hh += `</div>`;
@@ -1063,20 +1086,20 @@ function renderTimeline() {
       let tr = "";
       const w = job.schedule?.window;
       if (w && w.enabled && w.allowed) {
-        for (let d = 0; d < H; d++) {
+        for (let d = D0; d < D1; d++) {
           const hrs = w.allowed[dayName(dateOf(d))] || [];
           let s = null;
           for (let h = 0; h <= 24; h++) {
             const den = h < 24 && hrs[h] === false;
             if (den && s == null) s = h;
-            if (!den && s != null) { tr += `<div class="den" style="left:${(d * 1440 + s * 60) * px}px;width:${(h - s) * 60 * px}px"></div>`; s = null; }
+            if (!den && s != null) { const [ca, cb] = clip(d * 1440 + s * 60, d * 1440 + h * 60); if (cb > ca) tr += `<div class="den" style="left:${X(ca)}px;width:${(cb - ca) * px}px"></div>`; s = null; }
           }
         }
       }
       const draggable = ["daily", "monthly", "periodic"].includes(job.schedule?.type);
       for (const r of S.sim.runsByJob.get(job.id) || []) {
-        if (r.end <= 0 || r.start >= H * 1440) continue;
-        const x = Math.max(0, r.start * px), x2 = Math.min(W, r.end * px), bw = Math.max(2, x2 - x);
+        if (r.end <= V0 || r.start >= V1) continue;
+        const x = Math.max(0, X(r.start)), x2 = Math.min(W, X(r.end)), bw = Math.max(2, x2 - x);
         const total = r.end - r.start;
         const flags = r.flags;
         const crit = flags.has("window") || flags.has("self") || flags.has("copy");
@@ -1092,17 +1115,40 @@ function renderTimeline() {
   }
   parts.push(`</div>`);
   tl.innerHTML = parts.join("");
+  renderCrumb();
   tl.scrollLeft = keepX; tl.scrollTop = keepY;
 }
+
+function renderCrumb() {
+  const el = $("#crumb"), st = S.settings, bits = [];
+  if (st.view === "infra") bits.push("Showing <b>infrastructure only</b>");
+  if (st.view === "jobs") bits.push("Showing <b>jobs only</b>");
+  const c = S.selConf ? S.sim.conflicts.find(x => x.id === S.selConf) : null;
+  if (c) bits.push(`Highlighting <b>${esc(c.title)}</b>`);
+  else if (S.sel) bits.push(`Highlighting <b>${esc(nm(jobById(S.sel)))}</b>`);
+  else if (S.selHost) bits.push(`Inspecting <b>${esc(nm((S.data.hosts || []).find(h => h.id === S.selHost)))}</b>`);
+  if (!bits.length) { el.hidden = true; return; }
+  el.innerHTML = `<span>${bits.join(" · ")}</span><button class="btn" type="button" id="crumbBack">Back to full view</button><span class="note" style="margin:0">or press Esc</span>`;
+  el.hidden = false;
+  $("#crumbBack").addEventListener("click", resetView);
+}
+function resetView() {
+  S.selConf = null; S.sel = null; S.selHost = null; S.selRepo = null;
+  S.settings.view = "all";
+  document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.view === "all")));
+  setTab("conf"); pane.scrollTop = 0; renderTimeline();
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !e.target.closest("input, select, textarea")) resetView(); });
 
 function heat(p, px) {
   if (!p.cap) return "";
   let h = `<div class="heat" style="left:0;right:0">`;
   for (const s of p.segs) {
-    if (s.b <= 0 || s.a >= S.settings.horizon * 1440) continue;
+    const V0 = S.sim.V0, V1 = S.sim.END;
+    if (s.b <= V0 || s.a >= V1) continue;
     const r = s.d / p.cap, lv = r > 1 ? 3 : r > 0.6 ? 2 : 1;
-    const a = Math.max(0, s.a), b = Math.min(S.settings.horizon * 1440, s.b);
-    h += `<i class="l${lv}" style="left:${a * px}px;width:${Math.max(1, (b - a) * px)}px" title="${s.d} of ${p.cap} slots"></i>`;
+    const a = Math.max(V0, s.a), b = Math.min(V1, s.b);
+    h += `<i class="l${lv}" style="left:${(a - V0) * px}px;width:${Math.max(1, (b - a) * px)}px" title="${s.d} of ${p.cap} slots"></i>`;
   }
   return h + `</div>`;
 }
@@ -1146,7 +1192,7 @@ function paneJob() {
   if (!job) { pane.innerHTML = `<div class="empty">Click a job name or a bar in the timeline to inspect it. Drag a bar sideways to try a new start time.</div>`; return; }
   const sc = job.schedule || {}, f = job.fulls || {}, d = durations(job), h = job.history || {}, ov = job.override || {};
   const repo = repoById(job.repositoryId);
-  const runs = (S.sim.runsByJob.get(job.id) || []).filter(r => r.start >= 0 && r.start < S.sim.END);
+  const runs = (S.sim.runsByJob.get(job.id) || []).filter(r => r.start >= S.sim.V0 && r.start < S.sim.END);
   const myConf = S.sim.conflicts.filter(c => c.jobIds.includes(job.id) && c.sev !== "info");
   const others = S.data.jobs.filter(j => j.id !== job.id);
   let sched = "";
@@ -1228,7 +1274,7 @@ function paneHost() {
   const h = S.selHost ? (S.data.hosts || []).find(x => x.id === S.selHost) : null;
   if (!h) return setTab("conf");
   const o = (S.orig.hosts || []).find(x => x.id === h.id) || {};
-  const segs = (S.sim.hostLoad.get(h.id) || []).filter(x => x.b > 0 && x.a < S.sim.END);
+  const segs = (S.sim.hostLoad.get(h.id) || []).filter(x => x.b > S.sim.V0 && x.a < S.sim.END);
   const pk = segs.reduce((m, x) => x.cores > m.cores ? x : m, { cores: 0, ram: 0, pt: 0, rt: 0, a: 0 });
   const pkR = segs.reduce((m, x) => Math.max(m, x.ram), 0);
   pane.innerHTML = `<div class="ed"><h3>${esc(nm(h))}</h3><div class="sub">${esc(h.os || "Server")}${h.isBackupServer ? " · backup server" : ""}</div>
@@ -1278,7 +1324,7 @@ function changes() {
 function planText() {
   const ch = changes();
   const c = S.sim.conflicts;
-  const lines = [`# Nightshift change plan`, ``, `Server ${S.settings.anon ? "vbr-server" : (S.data.server || {}).name || "VBR"}, view from ${S.settings.start} for ${S.settings.horizon} days, ${S.settings.est === "p90" ? "slow night (p90)" : "typical"} durations.`, ``];
+  const lines = [`# Nightshift change plan`, ``, `Server ${S.settings.anon ? "vbr-server" : (S.data.server || {}).name || "VBR"}, view from ${S.settings.start} for ${S.settings.offset ? "one night" : S.settings.horizon + (S.settings.horizon === 1 ? " day" : " days")}, ${S.settings.est === "p90" ? "slow night (p90)" : "typical"} durations.`, ``];
   ch.filter(x => !x.note).forEach(x => lines.push(`- [ ] **${x.who}** · ${x.what}${x.from != null ? `: ${x.from} → ${x.to}` : x.to ? `: ${x.to}` : ""}`));
   const asm = ch.filter(x => x.note);
   if (asm.length) { lines.push(``, `Planning assumptions (not VBR settings)`); asm.forEach(x => lines.push(`- ${x.who} · ${x.what} ${x.to}`)); }
@@ -1353,17 +1399,17 @@ function focusConflict(id) {
   S.selConf = S.selConf === id ? null : id;
   const c = S.sim.conflicts.find(x => x.id === id);
   renderTimeline(); paneConflicts();
-  const on = pane.querySelector(".cf.on"); if (on) on.scrollIntoView({ block: "nearest" });
+  const on = pane.querySelector(".cf.on"); if (on) pane.scrollTop = Math.max(0, on.offsetTop - pane.offsetTop - 12); // scroll only the panel, not the page
   if (S.selConf && c) scrollToTime(c.focus, c.jobIds[0], c.hostId);
 }
 function scrollToTime(min, jobId, hostId) {
   const px = S.settings.pxh / 60;
   const row = jobId ? tl.querySelector(`[data-jobrow="${CSS.escape(jobId)}"]`) : hostId ? tl.querySelector(`[data-host="${CSS.escape(hostId)}"]`) : null;
   const top = row ? Math.max(0, row.offsetTop - tl.clientHeight / 2) : tl.scrollTop;
-  tl.scrollTo({ left: Math.max(0, min * px - 160), top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  tl.scrollTo({ left: Math.max(0, (min - S.sim.V0) * px - 160), top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   if (jobId) {
     if (row) {
-      const bar = [...row.querySelectorAll(".bar")].find(b => Math.abs(parseFloat(b.style.left) - Math.max(0, min * px)) < 2);
+      const bar = [...row.querySelectorAll(".bar")].find(b => Math.abs(parseFloat(b.style.left) - Math.max(0, (min - S.sim.V0) * px)) < 2);
       if (bar) { bar.classList.add("flash"); setTimeout(() => bar.classList.remove("flash"), 1300); }
     }
   }
@@ -1452,7 +1498,22 @@ function shiftJob(job, delta) {
 
 // controls
 $("#startDate").addEventListener("change", e => { if (e.target.value) { S.settings.start = e.target.value; render(); } });
-$("#horizon").addEventListener("change", e => { S.settings.horizon = +e.target.value; render(); });
+function setZoom(z) { S.settings.pxh = z; document.querySelectorAll("[data-zoom]").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.zoom === z))); }
+$("#horizon").addEventListener("change", e => {
+  const v = e.target.value, st = S.settings;
+  st.horizon = v === "night" ? 1 : +v; st.offset = v === "night" ? 720 : 0;
+  if (st.horizon <= 1 && st.pxh < 40) setZoom(40);          // a single day reads best at hour level
+  else if (st.horizon >= 7 && st.pxh > 16) setZoom(16);
+  render();
+  if (st.offset) tl.scrollLeft = 0; else if (st.horizon <= 3) scrollToEvening();
+});
+function shiftStart(days) {
+  const d = new Date(S.settings.start + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() + days);
+  S.settings.start = d.toISOString().slice(0, 10); $("#startDate").value = S.settings.start; render();
+}
+$("#dPrev").addEventListener("click", () => shiftStart(-1));
+$("#dNext").addEventListener("click", () => shiftStart(1));
+$("#dToday").addEventListener("click", () => { const n = new Date(); S.settings.start = new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())).toISOString().slice(0, 10); $("#startDate").value = S.settings.start; render(); });
 document.querySelectorAll("[data-est]").forEach(b => b.addEventListener("click", () => { S.settings.est = b.dataset.est; document.querySelectorAll("[data-est]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); render(); }));
 function setView(v) { S.settings.view = v; document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.view === v))); renderTimeline(); }
 document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
@@ -1466,6 +1527,11 @@ document.querySelectorAll("[data-zoom]").forEach(b => b.addEventListener("click"
 }));
 $("#anon").addEventListener("change", e => { S.settings.anon = e.target.checked; buildAnon(); render(); });
 $("#showOff").addEventListener("change", e => { S.settings.showOff = e.target.checked; renderTimeline(); });
+
+function scrollToEvening() {
+  // open on the first evening so the backup window is in view
+  requestAnimationFrame(() => { tl.scrollLeft = Math.max(0, (17 * 60 - S.sim.V0) * S.settings.pxh / 60); });
+}
 
 // loading data
 function showError(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = !msg; }
@@ -1482,7 +1548,7 @@ function load(data, isSample) {
   buildAnon();
   render();
   // open on the first evening so the backup window is in view
-  requestAnimationFrame(() => { tl.scrollLeft = Math.max(0, (17 * 60) * S.settings.pxh / 60); });
+  scrollToEvening();
 }
 $("#btnOpen").addEventListener("click", () => $("#file").click());
 $("#file").addEventListener("change", e => readFile(e.target.files[0]));
