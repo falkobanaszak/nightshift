@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build viewer",
+      "type": "shell",
+      "command": "python3 viewer/build.py",
+      "windows": { "command": "python viewer/build.py" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Rebuild sample data",
+      "type": "shell",
+      "command": "python3 sample/make_sample.py && python3 viewer/build.py",
+      "windows": { "command": "python sample/make_sample.py; python viewer/build.py" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test collector",
+      "type": "shell",
+      "command": "pwsh -NoProfile -File tests/Test-Collector.ps1",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Test viewer",
+      "type": "shell",
+      "command": "python3 tests/viewer_test.py",
+      "windows": { "command": "python tests/viewer_test.py" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

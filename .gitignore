@@ -1,0 +1,7 @@
+nightshift-*.json
+!sample/nightshift-sample.json
+__pycache__/
+*.png
+!docs/*.png
+dist/nightshift-demo.fragment.html
+.DS_Store

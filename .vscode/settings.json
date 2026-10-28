@@ -1,0 +1,10 @@
+{
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "editor.tabSize": 4,
+  "[html]": { "editor.tabSize": 2 },
+  "[json]": { "editor.tabSize": 2 },
+  "[yaml]": { "editor.tabSize": 2 },
+  "powershell.codeFormatting.preset": "OTBS",
+  "files.exclude": { "**/__pycache__": true }
+}

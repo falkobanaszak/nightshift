@@ -1,0 +1,2480 @@
+{
+  "schema": "nightshift/1",
+  "generatedAt": "2026-10-27T09:00:00",
+  "collector": {
+    "name": "sample",
+    "version": "0.1.0",
+    "mode": "Sample"
+  },
+  "server": {
+    "name": "vbr-demo",
+    "version": "13.0.1",
+    "timezone": "Europe/Lisbon",
+    "utcOffsetMinutes": 0
+  },
+  "anonymized": false,
+  "historyDays": 30,
+  "hosts": [
+    {
+      "id": "h-vbr",
+      "name": "vbr-demo",
+      "os": "Windows",
+      "cores": 8,
+      "ramGB": 32,
+      "isBackupServer": true
+    },
+    {
+      "id": "h-px1",
+      "name": "vproxy-01",
+      "os": "Linux",
+      "cores": 8,
+      "ramGB": 16
+    },
+    {
+      "id": "h-px2",
+      "name": "vproxy-02",
+      "os": "Linux",
+      "cores": 8,
+      "ramGB": 16
+    },
+    {
+      "id": "h-ext1",
+      "name": "repo-ext-01",
+      "os": "Linux",
+      "cores": 4,
+      "ramGB": 32
+    },
+    {
+      "id": "h-ext2",
+      "name": "repo-hv-01",
+      "os": "Windows",
+      "cores": 4,
+      "ramGB": 24
+    },
+    {
+      "id": "h-hard",
+      "name": "hardened-01",
+      "os": "Linux",
+      "cores": 4,
+      "ramGB": 16
+    },
+    {
+      "id": "h-branch",
+      "name": "branch-aio",
+      "os": "Windows",
+      "cores": 4,
+      "ramGB": 16
+    },
+    {
+      "id": "h-gw",
+      "name": "s3-gateway-01",
+      "os": "Linux",
+      "cores": null,
+      "ramGB": null
+    }
+  ],
+  "repositories": [
+    {
+      "id": "r-sobr",
+      "name": "SOBR-Primary",
+      "type": "ScaleOut",
+      "maxTasks": 12,
+      "extents": [
+        {
+          "name": "Extent-01",
+          "hostId": "h-ext1",
+          "maxTasks": 6
+        },
+        {
+          "name": "Extent-02",
+          "hostId": "h-ext2",
+          "maxTasks": 6
+        }
+      ],
+      "capacityTier": {
+        "enabled": true,
+        "move": true,
+        "copy": false
+      },
+      "mountServerId": "h-vbr"
+    },
+    {
+      "id": "r-hard",
+      "name": "Hardened-Linux-01",
+      "type": "LinuxHardened",
+      "maxTasks": 6,
+      "hostId": "h-hard",
+      "mountServerId": "h-vbr"
+    },
+    {
+      "id": "r-branch",
+      "name": "Branch-Repo",
+      "type": "WinLocal",
+      "maxTasks": 4,
+      "hostId": "h-branch",
+      "mountServerId": "h-branch"
+    },
+    {
+      "id": "r-obj",
+      "name": "Object-Offsite",
+      "type": "S3Compatible",
+      "maxTasks": 8,
+      "gatewayIds": [
+        "h-gw"
+      ],
+      "mountServerId": "h-vbr"
+    }
+  ],
+  "proxies": [
+    {
+      "id": "p-1",
+      "name": "vproxy-01",
+      "type": "VMware",
+      "maxTasks": 8,
+      "hostId": "h-px1"
+    },
+    {
+      "id": "p-2",
+      "name": "vproxy-02",
+      "type": "VMware",
+      "maxTasks": 8,
+      "hostId": "h-px2"
+    },
+    {
+      "id": "p-3",
+      "name": "repo-hv-01",
+      "type": "HyperV",
+      "maxTasks": 4,
+      "hostId": "h-ext2"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "j-dc",
+      "name": "Domain Controllers",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 3,
+      "sourceSizeGB": 300,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "20:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Saturday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 12,
+        "incP90Min": 18,
+        "fullMedianMin": 45,
+        "fullP90Min": 60,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-web",
+      "name": "Web Frontends",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 10,
+      "sourceSizeGB": 1800,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "21:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Saturday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 35,
+        "incP90Min": 55,
+        "fullMedianMin": 160,
+        "fullP90Min": 190,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-sql",
+      "name": "SQL Production",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 8,
+      "sourceSizeGB": 6200,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "22:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": true,
+          "kind": "weekly",
+          "days": [
+            "Saturday"
+          ]
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": true,
+        "kind": "monthly",
+        "monthly": {
+          "weekNumber": "Last",
+          "dayOfWeek": "Saturday"
+        }
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 75,
+        "incP90Min": 110,
+        "fullMedianMin": 330,
+        "fullP90Min": 380,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-files",
+      "name": "File Servers",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 12,
+      "sourceSizeGB": 14500,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "22:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Saturday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 95,
+        "incP90Min": 140,
+        "fullMedianMin": 520,
+        "fullP90Min": 600,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-exch",
+      "name": "Exchange DAG",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 4,
+      "sourceSizeGB": 5100,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "22:30",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Friday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 60,
+        "incP90Min": 85,
+        "fullMedianMin": 280,
+        "fullP90Min": 320,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-app",
+      "name": "App Servers",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 14,
+      "sourceSizeGB": 3900,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "after",
+        "afterJobId": "j-sql",
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Sunday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 50,
+        "incP90Min": 80,
+        "fullMedianMin": 240,
+        "fullP90Min": 290,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-vdi",
+      "name": "VDI Gold Images",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 40,
+      "sourceSizeGB": 9800,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "23:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ],
+        "window": {
+          "enabled": true,
+          "allowed": {
+            "Monday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Tuesday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Wednesday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Thursday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Friday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Saturday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Sunday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": true,
+          "kind": "monthly",
+          "monthly": {
+            "weekNumber": "First",
+            "dayOfWeek": "Monday"
+          }
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 22,
+        "incMedianMin": 140,
+        "incP90Min": 210,
+        "fullMedianMin": 470,
+        "fullP90Min": 540,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-agents",
+      "name": "Linux Agents",
+      "type": "Agent",
+      "platform": "Linux",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 18,
+      "sourceSizeGB": 2600,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "01:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 40,
+        "incP90Min": 70,
+        "fullMedianMin": 150,
+        "fullP90Min": 180,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-hv",
+      "name": "Hyper-V Cluster",
+      "type": "Backup",
+      "platform": "HyperV",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": false,
+      "proxyIds": [
+        "p-3"
+      ],
+      "objectCount": 9,
+      "sourceSizeGB": 4100,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "00:30",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Saturday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 55,
+        "incP90Min": 90,
+        "fullMedianMin": 260,
+        "fullP90Min": 300,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-copy-imm",
+      "name": "Copy to Hardened (Tier 1)",
+      "type": "BackupCopy",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-hard",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 12,
+      "sourceSizeGB": 11300,
+      "sourceJobIds": [
+        "j-sql",
+        "j-exch"
+      ],
+      "schedule": {
+        "type": "immediate",
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 45,
+        "incP90Min": 70,
+        "fullMedianMin": 200,
+        "fullP90Min": 240,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-copy-files",
+      "name": "Copy Files to Hardened",
+      "type": "BackupCopy",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-hard",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 12,
+      "sourceSizeGB": 14500,
+      "sourceJobIds": [
+        "j-files"
+      ],
+      "schedule": {
+        "type": "daily",
+        "time": "23:30",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 70,
+        "incP90Min": 120,
+        "fullMedianMin": 300,
+        "fullP90Min": 360,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-branch",
+      "name": "Branch Office",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-branch",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 6,
+      "sourceSizeGB": 1900,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "19:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday"
+        ],
+        "window": {
+          "enabled": true,
+          "allowed": {
+            "Monday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Tuesday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Wednesday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Thursday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Friday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Saturday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "Sunday": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              false,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": true,
+          "kind": "weekly",
+          "days": [
+            "Friday"
+          ]
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 20,
+        "incMedianMin": 150,
+        "incP90Min": 260,
+        "fullMedianMin": 420,
+        "fullP90Min": 500,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-dev",
+      "name": "Dev Lab",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-branch",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 15,
+      "sourceSizeGB": 2200,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "periodic",
+        "periodic": {
+          "everyMinutes": 240,
+          "offsetMinutes": 0
+        },
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 60,
+        "incMedianMin": 50,
+        "incP90Min": 75,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-cap",
+      "name": "Offsite Copy (Object)",
+      "type": "BackupCopy",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-obj",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 30,
+      "sourceSizeGB": 21000,
+      "sourceJobIds": [
+        "j-web",
+        "j-dc"
+      ],
+      "schedule": {
+        "type": "daily",
+        "time": "03:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 110,
+        "incP90Min": 170,
+        "fullMedianMin": 600,
+        "fullP90Min": 720,
+        "lastResult": "Success"
+      }
+    },
+    {
+      "id": "j-new",
+      "name": "New ERP (no history yet)",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 5,
+      "sourceSizeGB": 2400,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "22:15",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": true,
+          "days": [
+            "Saturday"
+          ]
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 0,
+        "incMedianMin": null,
+        "incP90Min": null,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": null
+      }
+    },
+    {
+      "id": "s-cfg",
+      "name": "Configuration backup",
+      "type": "System",
+      "platform": "Other",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-hard",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 1,
+      "sourceSizeGB": null,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "10:00",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": null
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 30,
+        "incMedianMin": 4,
+        "incP90Min": 6,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": "Success"
+      },
+      "systemKind": "ConfigurationBackup"
+    },
+    {
+      "id": "s-offload",
+      "name": "SOBR offload, SOBR-Primary",
+      "type": "System",
+      "platform": "Other",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 4,
+      "sourceSizeGB": null,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "periodic",
+        "periodic": {
+          "everyMinutes": 240,
+          "offsetMinutes": 0
+        },
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": null
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 180,
+        "incMedianMin": 20,
+        "incP90Min": 55,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": "Success"
+      },
+      "systemKind": "SobrOffload"
+    },
+    {
+      "id": "s-sure",
+      "name": "SureBackup, Tier 1 apps",
+      "type": "SureBackup",
+      "platform": "Other",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 3,
+      "sourceSizeGB": null,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "08:00",
+        "days": [
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": null
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 4,
+        "incMedianMin": 95,
+        "incP90Min": 120,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": "Success"
+      },
+      "systemKind": "SureBackup"
+    },
+    {
+      "id": "s-tape",
+      "name": "Tape GFS weekly",
+      "type": "Tape",
+      "platform": "Other",
+      "enabled": true,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": false,
+      "proxyIds": [],
+      "objectCount": 2,
+      "sourceSizeGB": null,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "01:00",
+        "days": [
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": null
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 4,
+        "incMedianMin": 310,
+        "incP90Min": 380,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": "Success"
+      },
+      "systemKind": "Tape"
+    },
+    {
+      "id": "j-old",
+      "name": "Decommissioned CRM",
+      "type": "Backup",
+      "platform": "VMware",
+      "enabled": false,
+      "scheduleEnabled": true,
+      "repositoryId": "r-sobr",
+      "proxyAuto": true,
+      "proxyIds": [],
+      "objectCount": 2,
+      "sourceSizeGB": 400,
+      "sourceJobIds": [],
+      "schedule": {
+        "type": "daily",
+        "time": "21:30",
+        "days": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "window": {
+          "enabled": false,
+          "allowed": null
+        },
+        "retry": {
+          "count": 3,
+          "waitMinutes": 10
+        }
+      },
+      "fulls": {
+        "active": {
+          "enabled": false
+        },
+        "synthetic": {
+          "enabled": false
+        }
+      },
+      "healthCheck": {
+        "enabled": false
+      },
+      "history": {
+        "runs": 5,
+        "incMedianMin": 10,
+        "incP90Min": 14,
+        "fullMedianMin": null,
+        "fullP90Min": null,
+        "lastResult": "Success"
+      }
+    }
+  ],
+  "activity": [
+    {
+      "kind": "BackgroundOperation",
+      "label": "Background retention",
+      "sessions": 30,
+      "medianMin": 35,
+      "p90Min": 70,
+      "profile": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "kind": "RepositoryMaintenance",
+      "label": "Repository maintenance (compact, health check)",
+      "sessions": 8,
+      "medianMin": 160,
+      "p90Min": 230,
+      "profile": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.6,
+        1.6,
+        1.6,
+        1.6,
+        0.8,
+        0.8,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "kind": "MalwareDetection",
+      "label": "Malware detection scans",
+      "sessions": 120,
+      "medianMin": 25,
+      "p90Min": 50,
+      "profile": [
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4,
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4,
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4,
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4,
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4,
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4,
+        0.4,
+        0.9,
+        0.9,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.4
+      ]
+    },
+    {
+      "kind": "Restore",
+      "label": "Restores and instant recovery",
+      "sessions": 22,
+      "medianMin": 18,
+      "p90Min": 75,
+      "profile": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "kind": "Infrastructure",
+      "label": "Infrastructure rescans",
+      "sessions": 180,
+      "medianMin": 6,
+      "p90Min": 12,
+      "profile": [
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0,
+        0.15,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

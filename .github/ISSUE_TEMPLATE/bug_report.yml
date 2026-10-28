@@ -1,0 +1,30 @@
+name: Something shows up wrong
+description: A schedule, server or conflict doesn't match what VBR shows
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: VBR version
+      placeholder: 13.0.1.1071
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Collector mode
+      options: [PowerShell, PowerShell with -ActivityFromRest, Rest]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong
+      description: Which job or server, what Nightshift shows, and what VBR shows for it.
+    validations:
+      required: true
+  - type: textarea
+    id: export
+    attributes:
+      label: Anonymized export
+      description: Run the collector with -Anonymize and attach the JSON, or paste the entry for the affected job.

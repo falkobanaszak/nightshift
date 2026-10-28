@@ -1,0 +1,1503 @@
+<title>Nightshift</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: control room. Summary strip on top, a scrollable night-by-night timeline on the left,
+   a working panel (conflicts, job editor, changes) on the right. Daylight hours tinted warm,
+   night left clear, so the backup window reads as the empty space between two warm bands. */
+:root {
+  --bg: #F3F5F9;
+  --surface: #FFFFFF;
+  --surface-2: #F8F9FC;
+  --ink: #17202C;
+  --muted: #5A6577;
+  --faint: #8A94A6;
+  --line: #DCE1EA;
+  --grid: rgba(23, 32, 44, .055);
+  --accent: #2C5BD0;
+  --accent-deep: #183A8F;
+  --accent-soft: #CBD7F6;
+  --accent-ink: #FFFFFF;
+  --synth: #7B93D8;
+  --day: rgba(244, 178, 64, .13);
+  --weekend: rgba(23, 32, 44, .035);
+  --denied: rgba(23, 32, 44, .10);
+  --crit: #C2362B;
+  --crit-soft: #FBE3E0;
+  --warn: #A86A12;
+  --warn-soft: #FBEFD9;
+  --ok: #2E7D52;
+  --info: #5A6577;
+  --info-soft: #E8ECF2;
+  --heat-1: #DCE5FA;
+  --heat-2: #9DB5EE;
+  --heat-3: #C2362B;
+  --sys: #2F8A84;
+  --act: #7A5CC2;
+  --shadow: 0 1px 2px rgba(23, 32, 44, .06), 0 4px 16px rgba(23, 32, 44, .06);
+  --f-display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E131B; --surface: #151C27; --surface-2: #111823; --ink: #E5EAF2; --muted: #98A3B5; --faint: #6D7889;
+    --line: #253041; --grid: rgba(229, 234, 242, .05); --accent: #7C9EFF; --accent-deep: #4F73DE; --accent-soft: #22325A;
+    --accent-ink: #0B1020; --synth: #5468A8; --day: rgba(244, 178, 64, .08); --weekend: rgba(229, 234, 242, .025);
+    --denied: rgba(229, 234, 242, .08); --crit: #FF6F62; --crit-soft: #3A1C1A; --warn: #E9B252; --warn-soft: #3A2C14;
+    --ok: #5CC28C; --info: #98A3B5; --info-soft: #1D2633; --heat-1: #1E2B47; --heat-2: #3A5498; --heat-3: #FF6F62; --sys: #4FC1B8; --act: #A58BEA;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E131B; --surface: #151C27; --surface-2: #111823; --ink: #E5EAF2; --muted: #98A3B5; --faint: #6D7889;
+  --line: #253041; --grid: rgba(229, 234, 242, .05); --accent: #7C9EFF; --accent-deep: #4F73DE; --accent-soft: #22325A;
+  --accent-ink: #0B1020; --synth: #5468A8; --day: rgba(244, 178, 64, .08); --weekend: rgba(229, 234, 242, .025);
+  --denied: rgba(229, 234, 242, .08); --crit: #FF6F62; --crit-soft: #3A1C1A; --warn: #E9B252; --warn-soft: #3A2C14;
+  --ok: #5CC28C; --info: #98A3B5; --info-soft: #1D2633; --heat-1: #1E2B47; --heat-2: #3A5498; --heat-3: #FF6F62; --sys: #4FC1B8; --act: #A58BEA;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 24px;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono, .tnum { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 14px; }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { font-family: var(--f-display); font-size: 26px; letter-spacing: -.01em; margin: 0; line-height: 1; }
+.brand h1 .moon { display: inline-block; width: .62em; height: .62em; border-radius: 50%; margin-right: .18em;
+  box-shadow: inset -.17em -.05em 0 0 var(--accent); transform: translateY(-.04em) rotate(-20deg); }
+.brand p { margin: 0; color: var(--muted); font-size: 13px; }
+.server { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: 12.5px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; background: var(--info-soft);
+  color: var(--muted); font-size: 12px; white-space: nowrap; }
+.pill.sample { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.top .spacer { flex: 1; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); border-color: var(--line); }
+.btn.danger { color: var(--crit); }
+
+/* Summary */
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 0; }
+.tile.tap { cursor: pointer; }
+.tile.tap:hover { border-color: var(--accent); }
+.tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.tile .v { font-family: var(--f-display); font-size: 24px; line-height: 1.15; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .v small { font-family: var(--f-body); font-size: 13px; color: var(--muted); font-weight: 400; }
+.tile .s { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sev-row { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.sev { font-size: 12px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+.sev.crit { background: var(--crit-soft); color: var(--crit); }
+.sev.warn { background: var(--warn-soft); color: var(--warn); }
+.sev.info { background: var(--info-soft); color: var(--info); }
+
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 10px; font-size: 13px; }
+.controls label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.controls select, .controls input[type="date"] { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; color: var(--ink); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 4px 10px; font-size: 12.5px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); font-size: 12px; margin-left: auto; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 18px; height: 10px; border-radius: 3px; display: inline-block; }
+.sw.inc { background: var(--accent); }
+.sw.full { background: var(--accent-deep); }
+.sw.synth { background: repeating-linear-gradient(135deg, var(--synth) 0 3px, var(--accent) 3px 6px); }
+.sw.health { background: repeating-linear-gradient(90deg, var(--ok) 0 2px, transparent 2px 4px); border: 1px solid var(--ok); }
+.sw.day { background: var(--day); border: 1px solid rgba(244, 178, 64, .45); }
+.sw.swden { background: repeating-linear-gradient(135deg, var(--denied) 0 3px, transparent 3px 6px); border: 1px solid var(--line); }
+
+/* Main split */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+
+/* Timeline */
+.tl-wrap { position: relative; }
+.tl { overflow: auto; max-height: calc(100vh - 230px); min-height: 420px; border-radius: 10px; position: relative; overscroll-behavior: contain; }
+.tl-inner { position: relative; }
+.row { display: flex; position: relative; }
+.lab { position: sticky; left: 0; z-index: 3; flex: 0 0 var(--labw); width: var(--labw); background: var(--surface);
+  border-right: 1px solid var(--line); padding: 0 10px; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.lab .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.lab .m { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--faint); }
+.track { position: relative; flex: 0 0 auto; }
+.row.job { height: 30px; border-bottom: 1px solid var(--grid); }
+.row.job .lab { cursor: pointer; }
+.row.job .lab:hover .n { color: var(--accent); }
+.row.job.sel .lab { box-shadow: inset 3px 0 0 var(--accent); }
+.row.job.sel .lab .n { font-weight: 600; }
+.row.job.off .lab .n { color: var(--faint); text-decoration: line-through; }
+.row.grp { height: 36px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.row.grp .lab { background: var(--surface-2); cursor: pointer; }
+.row.grp .lab .n { font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; }
+.row.grp .lab .m { font-size: 11.5px; }
+.row.pool { height: 26px; }
+.row.pool .lab .n { font-size: 12px; color: var(--muted); }
+.axis { position: sticky; top: 0; z-index: 5; height: 42px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.axis .lab { z-index: 6; justify-content: flex-end; padding-bottom: 6px; font-size: 11px; color: var(--faint); }
+.axis .day { position: absolute; top: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; padding-left: 6px; border-left: 1px solid var(--line); height: 36px; }
+.axis .day.we { color: var(--muted); }
+.axis .hr { position: absolute; bottom: 4px; font-size: 10.5px; color: var(--faint); font-family: var(--f-mono); transform: translateX(-50%); }
+.bg { position: absolute; z-index: 0; pointer-events: none; }
+.bg .dcol { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); }
+.bg .we { position: absolute; top: 0; bottom: 0; background: var(--weekend); }
+.bg .prod { position: absolute; top: 0; bottom: 0; background: var(--day); }
+.den { position: absolute; top: 3px; bottom: 3px; background: repeating-linear-gradient(135deg, var(--denied) 0 3px, transparent 3px 7px); border-radius: 3px; }
+.heat { position: absolute; top: 9px; height: 18px; }
+.heat i { position: absolute; top: 0; bottom: 0; display: block; }
+.heat i.l1 { background: var(--heat-1); }
+.heat i.l2 { background: var(--heat-2); }
+.heat i.l3 { background: var(--heat-3); }
+.pool .heat, .host .heat { top: 6px; height: 14px; }
+.heat i.a { background: var(--act); }
+.row.host, .row.act { height: 28px; border-bottom: 1px solid var(--grid); }
+.row.host .lab { cursor: pointer; }
+.row.host .lab:hover .n { color: var(--accent); }
+.row.host .lab .n, .row.act .lab .n { font-size: 12.5px; }
+.act .heat { top: 7px; height: 14px; }
+.bar.sys .s.inc, .bar.sys .s.full { background: var(--sys); }
+.sw.sys { background: var(--sys); }
+.sw.act { background: var(--act); opacity: .7; }
+
+.bar { position: absolute; top: 5px; height: 20px; border-radius: 4px; display: flex; overflow: hidden; z-index: 1;
+  cursor: grab; touch-action: none; box-shadow: 0 0 0 1px var(--surface); }
+.bar.nodrag { cursor: pointer; }
+.bar.dragging { cursor: grabbing; opacity: .85; z-index: 4; }
+.bar .s { height: 100%; flex: 0 0 auto; }
+.bar .s.inc { background: var(--accent); }
+.bar .s.full { background: var(--accent-deep); }
+.bar .s.synth { background: repeating-linear-gradient(135deg, var(--synth) 0 3px, var(--accent) 3px 6px); }
+.bar .s.health { background: repeating-linear-gradient(90deg, var(--ok) 0 2px, transparent 2px 4px); }
+.bar .t { position: absolute; left: 6px; top: 0; line-height: 20px; font-size: 11px; color: var(--accent-ink); white-space: nowrap; pointer-events: none; font-weight: 500; }
+.bar.est { box-shadow: 0 0 0 1px var(--surface); background-image: none; }
+.bar.est .s { opacity: .55; }
+.bar.est::after { content: ""; position: absolute; inset: 0; border: 1.5px dashed var(--accent-deep); border-radius: 4px; pointer-events: none; }
+.bar.c-warn { box-shadow: 0 0 0 2px var(--warn); }
+.bar.c-crit { box-shadow: 0 0 0 2px var(--crit); }
+.bar.dim { opacity: .28; }
+.bar.hl { box-shadow: 0 0 0 2px var(--ink); z-index: 2; }
+.bar.offjob { opacity: .35; filter: grayscale(1); }
+.flash { animation: flash 1.2s ease-out 1; }
+@keyframes flash { 0% { box-shadow: 0 0 0 6px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+
+.tip { position: fixed; z-index: 50; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 8px; padding: 8px 10px;
+  font-size: 12px; max-width: 300px; box-shadow: var(--shadow); line-height: 1.4; }
+.tip b { font-weight: 600; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; }
+.tip .r span:first-child { opacity: .7; }
+.tip .w { margin-top: 4px; color: var(--warn-soft); }
+
+/* Side panel */
+.side { position: sticky; top: 8px; display: flex; flex-direction: column; max-height: calc(100vh - 24px); }
+.tabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 6px; }
+.tabs button { border: 0; background: none; padding: 10px 10px 9px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 6px; align-items: center; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.tabs .count { font-size: 11px; background: var(--info-soft); color: var(--muted); padding: 0 6px; border-radius: 999px; font-weight: 600; }
+.tabs .count.hot { background: var(--crit-soft); color: var(--crit); }
+.pane { padding: 12px; overflow: auto; min-height: 200px; }
+.empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
+.cf { display: grid; grid-template-columns: 4px minmax(0, 1fr); gap: 0 10px; padding: 9px 8px 9px 0; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.cf + .cf { margin-top: 4px; }
+.cf:hover { background: var(--surface-2); border-color: var(--line); }
+.cf.on { background: var(--surface-2); border-color: var(--accent); }
+.cf .stripe { border-radius: 4px; }
+.cf.crit .stripe { background: var(--crit); }
+.cf.warn .stripe { background: var(--warn); }
+.cf.info .stripe { background: var(--faint); }
+.cf h4 { margin: 0; font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+.cf p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 5px; background: var(--info-soft); color: var(--muted); font-family: var(--f-mono); }
+.fix { margin-top: 6px; font-size: 12px; color: var(--ink); }
+.fix::before { content: "Try "; color: var(--muted); }
+
+.ed h3 { margin: 0; font-family: var(--f-display); font-size: 19px; line-height: 1.2; }
+.ed .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0 10px; }
+.ed .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+.ed .stats div { background: var(--surface-2); border-radius: 7px; padding: 6px 8px; }
+.ed .stats b { display: block; font-family: var(--f-mono); font-size: 13px; font-weight: 500; }
+.ed .stats span { font-size: 11px; color: var(--muted); }
+.fld { display: grid; gap: 4px; margin-bottom: 11px; }
+.fld > span { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
+.fld input[type="time"], .fld input[type="number"], .fld select, .fld .hint input { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; width: 100%; }
+.fld .hint { font-size: 12px; color: var(--faint); }
+.days { display: flex; gap: 3px; flex-wrap: wrap; }
+.days label { position: relative; }
+.days input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.days span { display: inline-block; min-width: 34px; text-align: center; padding: 3px 0; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--muted); }
+.days input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.days input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tog { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ed .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ch { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.ch b { font-weight: 600; }
+.ch .d { color: var(--muted); font-size: 12.5px; font-family: var(--f-mono); }
+textarea.out { width: 100%; min-height: 140px; font-family: var(--f-mono); font-size: 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-top: 8px; }
+.confirm { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--crit); }
+.note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+
+.drop { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--accent) 18%, transparent); border: 3px dashed var(--accent);
+  display: flex; align-items: center; justify-content: center; font-family: var(--f-display); font-size: 24px; color: var(--ink); }
+.banner { background: var(--crit-soft); color: var(--crit); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }
+
+@media (max-width: 1100px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; max-height: none; }
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .legend { margin-left: 0; }
+}
+@media (max-width: 560px) {
+  .summary { grid-template-columns: minmax(0, 1fr); }
+  .tl { max-height: 70vh; }
+  .brand h1 { font-size: 22px; }
+}
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1><span class="moon" aria-hidden="true"></span>Nightshift</h1>
+    <p>Backup window planner for Veeam Backup &amp; Replication</p>
+  </div>
+  <div class="server" id="server"></div>
+  <div class="spacer"></div>
+  <input type="file" id="file" accept=".json,application/json" hidden>
+  <button class="btn" id="btnOpen" type="button">Open export</button>
+  <button class="btn ghost" id="btnSample" type="button">Load sample</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<section class="summary" id="summary" aria-label="Summary"></section>
+
+<section class="controls" aria-label="View settings">
+  <label>From <input type="date" id="startDate"></label>
+  <label>Show
+    <select id="horizon">
+      <option value="7">7 days</option>
+      <option value="14" selected>14 days</option>
+      <option value="31">31 days</option>
+    </select>
+  </label>
+  <div class="seg" role="group" aria-label="Duration estimate">
+    <button type="button" data-est="median" aria-pressed="true">Typical run</button>
+    <button type="button" data-est="p90" aria-pressed="false">Slow night (p90)</button>
+  </div>
+  <div class="seg" role="group" aria-label="Rows to show">
+    <button type="button" data-view="all" aria-pressed="true">Everything</button>
+    <button type="button" data-view="jobs" aria-pressed="false">Jobs</button>
+    <button type="button" data-view="infra" aria-pressed="false">Infrastructure</button>
+  </div>
+  <div class="seg" role="group" aria-label="Group rows">
+    <button type="button" data-grp="repo" aria-pressed="true">By repository</button>
+    <button type="button" data-grp="type" aria-pressed="false">By job type</button>
+  </div>
+  <div class="seg" role="group" aria-label="Zoom">
+    <button type="button" data-zoom="8" aria-pressed="false">Weeks</button>
+    <button type="button" data-zoom="16" aria-pressed="true">Days</button>
+    <button type="button" data-zoom="40" aria-pressed="false">Hours</button>
+  </div>
+  <label class="tog"><input type="checkbox" id="anon"> Hide names</label>
+  <label class="tog"><input type="checkbox" id="showOff"> Show disabled jobs</label>
+  <div class="legend" aria-label="Legend">
+    <span><i class="sw inc"></i>Incremental</span>
+    <span><i class="sw full"></i>Active full</span>
+    <span><i class="sw synth"></i>Synthetic full</span>
+    <span><i class="sw health"></i>Health check</span>
+    <span><i class="sw sys"></i>System job</span>
+    <span><i class="sw act"></i>Observed background activity</span>
+    <span><i class="sw swden"></i>Outside backup window</span>
+    <span><i class="sw day"></i>Production hours</span>
+  </div>
+</section>
+
+<div class="main">
+  <div class="panel tl-wrap">
+    <div class="tl" id="tl" tabindex="0" aria-label="Job timeline"></div>
+  </div>
+  <aside class="panel side" aria-label="Details">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tabConf" aria-selected="true" data-tab="conf" type="button">Conflicts <span class="count" id="cntConf">0</span></button>
+      <button role="tab" id="tabJob" aria-selected="false" data-tab="job" type="button">Job</button>
+      <button role="tab" id="tabChg" aria-selected="false" data-tab="chg" type="button">Changes <span class="count" id="cntChg">0</span></button>
+      <button role="tab" id="tabSet" aria-selected="false" data-tab="set" type="button">Assumptions</button>
+    </div>
+    <div class="pane" id="pane"></div>
+  </aside>
+</div>
+
+<div class="tip" id="tip" hidden></div>
+<div class="drop" id="drop" hidden>Drop a Nightshift export to load it</div>
+
+<script type="application/json" id="sample-data">/*__SAMPLE__*/</script>
+<script>
+(() => {
+"use strict";
+
+// ---------- constants ----------
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAB = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MAB = MONTHS.map(m => m.slice(0, 3));
+let LABW = 230;
+const SYS_LABEL = { ConfigurationBackup: "Configuration backup", SobrOffload: "SOBR offload", SureBackup: "SureBackup", Tape: "Tape", SecurityAnalyzer: "Security analyzer", MalwareScan: "Malware scan" };
+const isSys = j => ["System", "SureBackup", "Tape"].includes(j.type);
+const typeLabel = j => j.type === "System" ? (SYS_LABEL[j.systemKind] || "System job") : (TYPE_LABEL[j.type] || j.type);
+const TYPE_LABEL = { System: "System jobs", Backup: "Backup", BackupCopy: "Backup copy", Agent: "Agent backup", Replica: "Replication", SureBackup: "SureBackup", Tape: "Tape", FileBackup: "File share", Other: "Other" };
+const SCHED_LABEL = { daily: "Daily", monthly: "Monthly", periodic: "Periodic", continuous: "Continuous", after: "After another job", immediate: "Immediate copy", none: "Not scheduled" };
+
+// ---------- state ----------
+const S = {
+  data: null, orig: null, isSample: false,
+  settings: {
+    start: null, horizon: 14, est: "median", group: "repo", view: "all", pxh: 16, anon: false, showOff: false,
+    prod: { start: 480, end: 1080, days: DAYS.slice(0, 5) },
+    throughput: 250, incPct: 15, synthPct: 35, healthPct: 25,
+    proxyCores: 1, proxyRam: 2, repoTasksPerCore: 3, repoRamPerCore: 4,
+  },
+  sim: null, sel: null, selConf: null, tab: "conf", confirmReset: false,
+};
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const pad = n => String(n).padStart(2, "0");
+const hhmm = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ":" + pad(m % 60); };
+const parseHM = s => { const m = /^(\d{1,2}):(\d{2})/.exec(s || ""); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+const dur = m => { m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}h ${pad(r)}m` : `${r}m`; };
+
+// ---------- time model: minutes since 00:00 of the start date, naive server-local time ----------
+let T0 = 0;
+const dateOf = dayIdx => new Date(T0 + dayIdx * 864e5);
+const dayName = dt => DAYS[(dt.getUTCDay() + 6) % 7];
+const fmtAt = min => { const d = dateOf(Math.floor(min / 1440)); return `${DAB[(d.getUTCDay() + 6) % 7]} ${d.getUTCDate()} ${MAB[d.getUTCMonth()]} ${hhmm(min)}`; };
+const fmtDay = dayIdx => { const d = dateOf(dayIdx); return `${DAB[(d.getUTCDay() + 6) % 7]} ${d.getUTCDate()} ${MAB[d.getUTCMonth()]}`; };
+
+function monthlyMatch(r, dt) {
+  if (!r) return false;
+  if (Array.isArray(r.months) && r.months.length && !r.months.includes(MONTHS[dt.getUTCMonth()])) return false;
+  if (r.dayOfMonth != null && r.dayOfMonth !== "") {
+    if (r.dayOfMonth === "Last") return new Date(dt.getTime() + 864e5).getUTCMonth() !== dt.getUTCMonth();
+    return dt.getUTCDate() === +r.dayOfMonth;
+  }
+  if (r.weekNumber && r.dayOfWeek) {
+    if (dayName(dt) !== r.dayOfWeek) return false;
+    if (r.weekNumber === "Last") return new Date(dt.getTime() + 7 * 864e5).getUTCMonth() !== dt.getUTCMonth();
+    const n = { First: 1, Second: 2, Third: 3, Fourth: 4 }[r.weekNumber];
+    return Math.ceil(dt.getUTCDate() / 7) === n;
+  }
+  return false;
+}
+const monthlyText = r => !r ? "" : (r.dayOfMonth != null && r.dayOfMonth !== "" ? `day ${r.dayOfMonth} of the month` : `${(r.weekNumber || "").toLowerCase()} ${r.dayOfWeek || ""} of the month`);
+function ruleMatch(rule, dt) {
+  if (!rule || !rule.enabled) return false;
+  if (rule.kind === "monthly") return monthlyMatch(rule.monthly, dt);
+  return Array.isArray(rule.days) && rule.days.includes(dayName(dt));
+}
+
+// ---------- lookups ----------
+const repoById = id => S.data.repositories.find(r => r.id === id);
+const jobById = id => S.data.jobs.find(j => j.id === id);
+const origJob = id => S.orig.jobs.find(j => j.id === id);
+let anonMap = new Map();
+function buildAnon() {
+  anonMap = new Map();
+  S.data.jobs.forEach((j, i) => anonMap.set(j.id, `Job ${pad(i + 1)}`));
+  S.data.repositories.forEach((r, i) => anonMap.set(r.id, `Repository ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? Math.floor(i / 26) : ""}`));
+  (S.data.proxies || []).forEach((p, i) => anonMap.set(p.id, `Proxy ${i + 1}`));
+  (S.data.hosts || []).forEach((h, i) => anonMap.set(h.id, `Server ${pad(i + 1)}`));
+}
+const nm = obj => !obj ? "Unknown" : (S.settings.anon && !S.data.anonymized && anonMap.has(obj.id) ? anonMap.get(obj.id) : obj.name);
+
+// ---------- durations ----------
+function durations(job) {
+  const h = job.history || {}, p90 = S.settings.est === "p90";
+  const pick = (med, hi) => p90 ? (hi ?? (med != null ? med * 1.3 : null)) : med;
+  let fullH = pick(h.fullMedianMin, h.fullP90Min);
+  let incH = pick(h.incMedianMin, h.incP90Min);
+  const gb = +job.sourceSizeGB || 0;
+  const estFull = Math.max(10, gb ? (gb * 1024) / (S.settings.throughput * 60) : 60) * (p90 ? 1.25 : 1);
+  const full = fullH ?? estFull;
+  const ov = job.override || {};
+  const inc = ov.durationMin != null && ov.durationMin !== "" ? +ov.durationMin : (incH ?? Math.max(5, full * S.settings.incPct / 100));
+  return { inc, full, incEst: incH == null && (ov.durationMin == null || ov.durationMin === ""), fullEst: fullH == null };
+}
+
+function tasksFor(job, cap) {
+  const ov = job.override || {};
+  if (ov.tasks != null && ov.tasks !== "") return Math.max(1, +ov.tasks);
+  return Math.max(1, Math.min(+job.objectCount || 1, cap || 9999));
+}
+
+// ---------- simulation ----------
+function simulate() {
+  const st = S.settings, H = st.horizon, END = H * 1440, BEGIN = -1440;
+  const d0 = st.start.split("-").map(Number);
+  T0 = Date.UTC(d0[0], d0[1] - 1, d0[2]);
+  const jobs = S.data.jobs.filter(j => j.enabled !== false && j.scheduleEnabled !== false);
+  const runsByJob = new Map();
+  let rid = 0;
+
+  function fullsFor(job, dt) {
+    const f = job.fulls || {};
+    const active = ruleMatch(f.active, dt);
+    const synthetic = !active && f.synthetic && f.synthetic.enabled && (f.synthetic.days || []).includes(dayName(dt));
+    const health = ruleMatch(job.healthCheck, dt);
+    return { kind: active ? "active" : synthetic ? "synthetic" : "inc", health };
+  }
+
+  function makeRun(job, start, first, scale = 1, srcId = null) {
+    const dt = dateOf(Math.floor(start / 1440));
+    const f = first ? fullsFor(job, dt) : { kind: "inc", health: false };
+    const d = durations(job);
+    const seg = [];
+    let est = false;
+    if (f.kind === "active") { seg.push({ k: "full", m: d.full * scale }); est = d.fullEst; }
+    else if (f.kind === "synthetic") { seg.push({ k: "inc", m: d.inc * scale }, { k: "synth", m: d.full * st.synthPct / 100 * scale }); est = d.incEst || d.fullEst; }
+    else { seg.push({ k: "inc", m: d.inc * scale }); est = d.incEst; }
+    if (f.health) { seg.push({ k: "health", m: d.full * st.healthPct / 100 }); est = est || d.fullEst; }
+    const len = Math.max(3, seg.reduce((a, s) => a + s.m, 0));
+    return { id: ++rid, jobId: job.id, start, end: start + len, seg, kind: f.kind, health: f.health, est, flags: new Set(), src: srcId };
+  }
+
+  const done = new Set();
+  const add = (job, list) => { runsByJob.set(job.id, list.filter(r => r.end > BEGIN && r.start < END)); done.add(job.id); };
+
+  // pass 1: jobs with their own clock
+  for (const job of jobs) {
+    const sc = job.schedule || { type: "none" };
+    const list = [];
+    if (sc.type === "daily") {
+      const t = parseHM(sc.time);
+      if (t != null) for (let i = -1; i < H; i++) { const dt = dateOf(i); if ((sc.days || DAYS).includes(dayName(dt))) list.push(makeRun(job, i * 1440 + t, true)); }
+      add(job, list);
+    } else if (sc.type === "monthly") {
+      const t = parseHM((sc.monthly || {}).time || sc.time);
+      if (t != null) for (let i = -1; i < H; i++) { if (monthlyMatch(sc.monthly, dateOf(i))) list.push(makeRun(job, i * 1440 + t, true)); }
+      add(job, list);
+    } else if (sc.type === "periodic") {
+      const N = Math.max(5, +((sc.periodic || {}).everyMinutes) || 60), off = +((sc.periodic || {}).offsetMinutes) || 0;
+      let lastDay = null;
+      for (let t = BEGIN + off; t < END; t += N) {
+        if (!allowedAt(job, t)) continue;
+        const di = Math.floor(t / 1440);
+        list.push(makeRun(job, t, di !== lastDay)); lastDay = di;
+      }
+      add(job, list);
+    } else if (sc.type === "continuous") {
+      let t = BEGIN, n = 0, lastDay = null;
+      while (t < END && n++ < 3000) {
+        if (!allowedAt(job, t)) { t = (Math.floor(t / 60) + 1) * 60; continue; }
+        const di = Math.floor(t / 1440);
+        const r = makeRun(job, t, di !== lastDay); lastDay = di; list.push(r); t = r.end + 1;
+      }
+      add(job, list);
+    } else if (sc.type !== "after" && sc.type !== "immediate") {
+      add(job, []);
+    }
+  }
+  // pass 2: chained and immediate jobs, resolved in dependency order
+  for (let pass = 0; pass < 12; pass++) {
+    let progress = false;
+    for (const job of jobs) {
+      if (done.has(job.id)) continue;
+      const sc = job.schedule || {};
+      const deps = sc.type === "after" ? [sc.afterJobId] : (job.sourceJobIds || []);
+      const live = deps.filter(id => jobs.some(j => j.id === id));
+      if (!live.every(id => done.has(id))) continue;
+      const list = [];
+      if (sc.type === "after") {
+        for (const pr of (runsByJob.get(sc.afterJobId) || [])) list.push(makeRun(job, pr.end + 1, true, 1, pr.jobId));
+      } else {
+        const tot = live.reduce((a, id) => a + (+jobById(id).objectCount || 1), 0) || 1;
+        for (const id of live) {
+          const sh = (+jobById(id).objectCount || 1) / tot;
+          for (const pr of (runsByJob.get(id) || [])) list.push(makeRun(job, pr.end + 2, false, sh, id));
+        }
+        list.sort((a, b) => a.start - b.start);
+      }
+      add(job, list); progress = true;
+    }
+    if (!progress) break;
+  }
+  for (const job of jobs) if (!done.has(job.id)) add(job, []); // circular or missing dependency
+
+  const all = [...runsByJob.values()].flat();
+  const conflicts = [];
+  const pressure = new Map(); // key -> {cap, segs}
+
+  // --- resource pressure (repository task slots and proxy pools) ---
+  const resources = new Map();
+  for (const job of jobs) {
+    const repo = repoById(job.repositoryId);
+    if (repo) {
+      const key = "repo:" + repo.id;
+      if (!resources.has(key)) resources.set(key, { key, label: nm(repo), cap: +repo.maxTasks || 0, repo, jobs: [] });
+      resources.get(key).jobs.push(job);
+    }
+    if (usesProxy(job)) {
+      const pk = proxyKey(job);
+      if (pk) {
+        if (!resources.has(pk.key)) resources.set(pk.key, { key: pk.key, label: pk.label, cap: pk.cap, pool: true, jobs: [] });
+        resources.get(pk.key).jobs.push(job);
+      }
+    }
+  }
+  for (const res of resources.values()) {
+    const ev = [];
+    for (const job of res.jobs) {
+      const t = tasksFor(job, res.cap);
+      for (const r of runsByJob.get(job.id) || []) { ev.push([r.start, t, r]); ev.push([r.end, -t, r]); }
+    }
+    ev.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const segs = []; let cur = 0; const active = new Map();
+    for (let i = 0; i < ev.length; i++) {
+      const [t, dlt, r] = ev[i];
+      if (dlt > 0) active.set(r.id, r); else active.delete(r.id);
+      cur += dlt;
+      const nt = i + 1 < ev.length ? ev[i + 1][0] : t;
+      if (nt > t && cur > 0) segs.push({ a: t, b: nt, d: cur, runs: [...active.values()] });
+    }
+    pressure.set(res.key, { cap: res.cap, segs });
+    if (!res.cap) continue;
+    // oversubscription occurrences
+    const occ = [];
+    for (const s of segs) {
+      if (s.d <= res.cap || s.runs.length < 2 || s.b <= 0 || s.a >= END) continue;
+      const last = occ[occ.length - 1];
+      if (last && s.a <= last.end + 1) { last.end = s.b; last.peak = Math.max(last.peak, s.d); s.runs.forEach(r => last.runs.add(r)); }
+      else occ.push({ start: s.a, end: s.b, peak: s.d, runs: new Set(s.runs) });
+    }
+    if (occ.length) {
+      const worst = occ.reduce((a, b) => b.peak > a.peak ? b : a);
+      const jobsIn = new Set(); occ.forEach(o => o.runs.forEach(r => { jobsIn.add(r.jobId); r.flags.add("slots"); }));
+      const days = new Set(occ.map(o => Math.floor(o.start / 1440)));
+      const crit = worst.peak >= res.cap * 1.5;
+      conflicts.push({
+        id: "slots:" + res.key, type: "slots", sev: crit ? "crit" : "warn", resKey: res.key,
+        title: `${res.label} ${res.pool ? "are" : "is"} oversubscribed`,
+        detail: `Up to ${worst.peak} parallel tasks against ${res.cap} slots, on ${days.size} of ${H} days. Jobs will queue and finish later than shown.`,
+        fix: `stagger the start times of ${[...worst.runs].map(r => nm(jobById(r.jobId))).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3).join(", ")}.`,
+        occ: occ.map(o => ({ start: o.start, end: o.end, label: `${fmtAt(o.start)} · ${o.peak}/${res.cap}` })), focus: worst.start, jobIds: [...jobsIn],
+      });
+    }
+  }
+
+  // --- server load: every role a server holds adds to its CPU and RAM need ---
+  const hostLoad = new Map(), contrib = new Map();
+  const pushC = (hid, a, b, pt, rt) => { if (!hid || !(b > a)) return; if (!contrib.has(hid)) contrib.set(hid, []); contrib.get(hid).push([a, pt, rt], [b, -pt, -rt]); };
+  for (const res of resources.values()) {
+    const p = pressure.get(res.key); if (!p) continue;
+    let targets = [];
+    if (res.pool) {
+      const px = S.data.proxies || [];
+      const set = res.key.startsWith("pool:auto:") ? px.filter(x => (x.type || "VMware") === res.key.slice(10)) : px.filter(x => res.key.slice(5).split(",").includes(x.id));
+      const tot = set.reduce((a, x) => a + (+x.maxTasks || 1), 0) || 1;
+      targets = set.map(x => ({ hid: x.hostId, share: (+x.maxTasks || 1) / tot, proxy: true }));
+    } else {
+      const r = res.repo, ext = (r.extents || []).filter(e => e && e.hostId);
+      if (ext.length) { const tot = ext.reduce((a, e) => a + (+e.maxTasks || 1), 0); targets = ext.map(e => ({ hid: e.hostId, share: (+e.maxTasks || 1) / tot })); }
+      else if ((r.gatewayIds || []).length) targets = r.gatewayIds.map(g => ({ hid: g, share: 1 / r.gatewayIds.length }));
+      else if (r.hostId) targets = [{ hid: r.hostId, share: 1 }];
+    }
+    for (const t of targets) for (const sg of p.segs) {
+      const d = Math.min(sg.d, res.cap || sg.d) * t.share; // queued tasks don't load the server
+      pushC(t.hid, sg.a, sg.b, t.proxy ? d : 0, t.proxy ? 0 : d);
+    }
+  }
+  for (const h of (S.data.hosts || [])) {
+    const ev = (contrib.get(h.id) || []).sort((a, b) => a[0] - b[0]);
+    const segs = []; let pt = 0, rt = 0;
+    for (let i = 0; i < ev.length; i++) {
+      pt += ev[i][1]; rt += ev[i][2];
+      const nt = i + 1 < ev.length ? ev[i + 1][0] : ev[i][0];
+      if (nt > ev[i][0] && (pt > 1e-6 || rt > 1e-6)) {
+        const repoCores = rt / st.repoTasksPerCore;
+        segs.push({ a: ev[i][0], b: nt, pt, rt, cores: pt * st.proxyCores + repoCores, ram: pt * st.proxyRam + repoCores * st.repoRamPerCore });
+      }
+    }
+    hostLoad.set(h.id, segs);
+    const vis = segs.filter(x => x.b > 0 && x.a < END);
+    if (!vis.length) continue;
+    const pk = vis.reduce((m, x) => x.cores > m.cores ? x : m, vis[0]);
+    const pkR = vis.reduce((m, x) => Math.max(m, x.ram), 0);
+    const roles = hostRoles(h).join(", ");
+    const over = x => (h.cores && x.cores > h.cores + 1e-6) || (h.ramGB && x.ram > h.ramGB + 1e-6);
+    if (!h.cores && !h.ramGB) {
+      conflicts.push({ id: "hostinfo:" + h.id, type: "hostinfo", sev: "info", jobIds: [], hostId: h.id,
+        title: `${nm(h)} hardware unknown`,
+        detail: `At peak this server needs about ${pk.cores.toFixed(1)} cores and ${Math.ceil(pkR)} GB RAM for its Veeam roles (${roles}). Enter its cores and RAM to check it.`,
+        fix: "click the server name in the Servers group.", occ: [], focus: pk.a });
+      continue;
+    }
+    const occ = [];
+    for (const x of vis) { if (!over(x)) continue; const l = occ[occ.length - 1]; if (l && x.a <= l.end + 1) { l.end = x.b; l.c = Math.max(l.c, x.cores); l.r = Math.max(l.r, x.ram); } else occ.push({ start: Math.max(0, x.a), end: x.b, c: x.cores, r: x.ram }); }
+    if (occ.length) {
+      const w = occ.reduce((a, b) => b.c > a.c ? b : a);
+      const crit = (h.cores && w.c > h.cores * 1.5) || (h.ramGB && w.r > h.ramGB * 1.5);
+      const days = new Set(occ.map(o => Math.floor(o.start / 1440)));
+      conflicts.push({ id: "host:" + h.id, type: "host", sev: crit ? "crit" : "warn", jobIds: [], hostId: h.id,
+        title: `${nm(h)} is short on CPU or RAM`,
+        detail: `Its roles (${roles}) need up to ${w.c.toFixed(1)} cores and ${Math.ceil(w.r)} GB RAM, against ${h.cores || "?"} cores and ${h.ramGB || "?"} GB, on ${days.size} of ${H} days. Tasks will run slower than their history.`,
+        fix: "lower the task limit on this server's roles, move a role to another server, or add CPU and RAM.",
+        occ: occ.map(o => ({ start: o.start, label: `${fmtAt(o.start)} · ${o.c.toFixed(1)}/${h.cores || "?"} cores` })), focus: w.start });
+    }
+  }
+
+  // --- observed background activity that lands on busy hours ---
+  const busyAt = (t0, t1) => {
+    const out = new Set();
+    for (const [key, p] of pressure) {
+      if (!p.cap || !key.startsWith("repo:")) continue;
+      if (p.segs.some(x => x.a < t1 && x.b > t0 && x.d / p.cap >= 0.9)) out.add(nm(repoById(key.slice(5))));
+    }
+    for (const h of (S.data.hosts || [])) if (h.cores && (hostLoad.get(h.id) || []).some(x => x.a < t1 && x.b > t0 && x.cores / h.cores >= 0.9)) out.add(nm(h));
+    return out;
+  };
+  for (const a of (S.data.activity || [])) {
+    if (!Array.isArray(a.profile) || a.profile.length !== 168) continue;
+    let hours = 0, peakV = 0; const names = new Set(), occ = [];
+    for (let d = 0; d < H; d++) {
+      const wd = DAYS.indexOf(dayName(dateOf(d)));
+      for (let h = 0; h < 24; h++) {
+        const v = a.profile[wd * 24 + h];
+        if (v < 0.3) continue;
+        const t = d * 1440 + h * 60, b = busyAt(t, t + 60);
+        if (b.size) { hours++; peakV = Math.max(peakV, v); b.forEach(n => names.add(n)); if (!occ.length || occ[occ.length - 1].start + 60 < t) occ.push({ start: t, label: fmtAt(t) }); }
+      }
+    }
+    if (hours >= 2) {
+      const tw = topWindow(a.profile), list = [...names];
+      conflicts.push({ id: "act:" + a.kind + a.label, type: "act", sev: peakV >= 1 ? "warn" : "info", jobIds: [],
+        title: `Busy hours overlap with ${a.label.charAt(0).toLowerCase() + a.label.slice(1)}`,
+        detail: `From ${a.sessions || "past"} sessions, this usually runs ${tw}. On ${occ.length} occasion${occ.length > 1 ? "s" : ""} in view that's while ${list.slice(0, 3).join(", ")}${list.length > 3 ? " and others" : ""} ${list.length > 1 ? "are" : "is"} at 90% or more of capacity.`,
+        fix: a.kind === "RepositoryMaintenance" ? "move compact and health check days away from your full backup night." : "keep that slot free of heavy jobs, or reschedule the activity if VBR lets you.",
+        occ, focus: occ[0] ? occ[0].start : 0 });
+    }
+  }
+
+  // --- per-job checks ---
+  const prod = st.prod;
+  for (const job of jobs) {
+    const runs = runsByJob.get(job.id) || [];
+    const vis = runs.filter(r => r.start >= 0 && r.start < END);
+    const J = nm(job);
+    // backup window exceeded
+    if (job.schedule?.window?.enabled) {
+      const hits = [];
+      for (const r of vis) { const m = firstDenied(job, r.start + 1, r.end); if (m != null) { r.flags.add("window"); hits.push({ r, m }); } }
+      if (hits.length) {
+        const w = hits.reduce((a, b) => (b.r.end - b.m) > (a.r.end - a.m) ? b : a);
+        conflicts.push({ id: "window:" + job.id, type: "window", sev: "crit", jobIds: [job.id],
+          title: `${J} runs past its backup window`,
+          detail: `On ${hits.length} run${hits.length > 1 ? "s" : ""} the job is still busy when the window closes. The worst is ${fmtAt(w.r.start)}, window closes ${hhmm(w.m)}, predicted end ${hhmm(w.r.end)}. Veeam can terminate the job at the window edge.`,
+          fix: w.r.kind !== "inc" ? "move the full backup to a night with more room, or start earlier." : "start earlier or widen the window.",
+          occ: hits.map(h => ({ start: h.r.start, label: fmtAt(h.r.start) })), focus: w.r.start });
+      }
+      const bad = vis.filter(r => !allowedAt(job, r.start) && r.start >= 0);
+      if (bad.length) {
+        bad.forEach(r => r.flags.add("window"));
+        conflicts.push({ id: "wstart:" + job.id, type: "wstart", sev: "warn", jobIds: [job.id],
+          title: `${J} is scheduled outside its own window`,
+          detail: `${bad.length} scheduled start${bad.length > 1 ? "s fall" : " falls"} in hours the backup window does not allow, so those runs will not start on time.`,
+          fix: "align the start time with the window.", occ: bad.map(r => ({ start: r.start, label: fmtAt(r.start) })), focus: bad[0].start });
+      }
+    }
+    // production hours
+    if (prod.days.length && prod.end > prod.start) {
+      const hits = [];
+      for (const r of vis) { const m = prodOverlap(r.start, r.end); if (m != null) { r.flags.add("prod"); hits.push({ r, m }); } }
+      if (hits.length) {
+        const days = new Set(hits.map(h => Math.floor(h.m / 1440)));
+        const w = hits.reduce((a, b) => (b.r.end - b.m) > (a.r.end - a.m) ? b : a);
+        const periodic = ["periodic", "continuous"].includes(job.schedule?.type) || isSys(job);
+        conflicts.push({ id: "prod:" + job.id, type: "prod", sev: periodic ? "info" : "warn", jobIds: [job.id],
+          title: `${J} runs into production hours`,
+          detail: isSys(job) ? `This system job runs ${hits.length} times during production hours over ${days.size} days. That's often fine, but it competes with restores and daytime jobs.` : periodic ? `This job runs every ${job.schedule.periodic?.everyMinutes || "few"} minutes, so ${hits.length} runs land in production hours on ${days.size} days. Fine if that is intended.`
+            : `Still running during production hours on ${days.size} day${days.size > 1 ? "s" : ""}. Worst case ${fmtAt(w.r.start)} ends ${hhmm(w.r.end)}.`,
+          fix: periodic ? "add a backup window to keep it out of business hours." : (w.r.kind !== "inc" ? "move the full to a weekend night." : "start earlier."),
+          occ: hits.map(h => ({ start: h.r.start, label: fmtAt(h.r.start) })), focus: w.r.start });
+      }
+    }
+    // overlapping itself
+    const self = [];
+    for (let i = 1; i < runs.length; i++) if (runs[i].start < runs[i - 1].end && runs[i].end > 0 && runs[i].start < END && !runs[i].src) { runs[i].flags.add("self"); self.push(runs[i]); }
+    if (self.length) conflicts.push({ id: "self:" + job.id, type: "self", sev: "crit", jobIds: [job.id],
+      title: `${J} is still running when its next run is due`,
+      detail: `${self.length} run${self.length > 1 ? "s start" : " starts"} before the previous one has finished. Veeam skips or delays the overlapping run.`,
+      fix: "lengthen the interval or shorten the job.", occ: self.map(r => ({ start: r.start, label: fmtAt(r.start) })), focus: self[0].start });
+    // copy before source
+    if (job.type === "BackupCopy" && job.schedule?.type !== "immediate" && (job.sourceJobIds || []).length) {
+      const hits = [];
+      for (const r of vis) for (const sid of job.sourceJobIds) for (const sr of (runsByJob.get(sid) || [])) {
+        if (r.start >= sr.start && r.start < sr.end) { hits.push({ r, sr }); r.flags.add("copy"); }
+      }
+      if (hits.length) {
+        const srcNames = [...new Set(hits.map(h => nm(jobById(h.sr.jobId))))];
+        conflicts.push({ id: "copy:" + job.id, type: "copy", sev: "crit", jobIds: [job.id, ...new Set(hits.map(h => h.sr.jobId))],
+          title: `${J} starts before its source finishes`,
+          detail: `${hits.length} run${hits.length > 1 ? "s start" : " starts"} while ${srcNames.join(", ")} is still writing, so the copy picks up the previous restore point.`,
+          fix: `start it after ${hhmm(Math.max(...hits.map(h => h.sr.end)))} or switch it to immediate copy mode.`,
+          occ: hits.map(h => ({ start: h.r.start, label: fmtAt(h.r.start) })), focus: hits[0].r.start });
+      }
+    }
+    // no history
+    const h = job.history || {};
+    if ((h.runs || 0) === 0 && vis.length) conflicts.push({ id: "hist:" + job.id, type: "hist", sev: "info", jobIds: [job.id],
+      title: `${J} has no run history yet`,
+      detail: `Durations are estimated from ${job.sourceSizeGB ? Math.round(job.sourceSizeGB).toLocaleString() + " GB at " + st.throughput + " MB/s" : "defaults"}. Bars are drawn dashed.`,
+      fix: "set a duration in the Job tab if you know it.", occ: [], focus: vis[0].start });
+  }
+
+  // --- several fulls on one repository on the same day ---
+  for (const repo of S.data.repositories) {
+    const byDay = new Map();
+    for (const job of jobs.filter(j => j.repositoryId === repo.id)) for (const r of runsByJob.get(job.id) || []) {
+      if (r.kind === "inc" || r.start < 0 || r.start >= END) continue;
+      const di = Math.floor((r.start - 720) / 1440); // a "night" runs noon to noon
+      if (!byDay.has(di)) byDay.set(di, []);
+      byDay.get(di).push(r);
+    }
+    const nights = [...byDay.entries()].filter(([, rs]) => new Set(rs.map(r => r.jobId)).size >= 2);
+    if (nights.length) {
+      const worst = nights.reduce((a, b) => b[1].length > a[1].length ? b : a);
+      nights.forEach(([, rs]) => rs.forEach(r => r.flags.add("fulls")));
+      conflicts.push({ id: "fulls:" + repo.id, type: "fulls", sev: worst[1].length >= 3 ? "warn" : "info", jobIds: [...new Set(nights.flatMap(([, rs]) => rs.map(r => r.jobId)))],
+        title: `${worst[1].length} full backups land on ${nm(repo)} the same night`,
+        detail: `${worst[1].map(r => nm(jobById(r.jobId))).join(", ")} all run a full or synthetic full on the night of ${fmtDay(worst[0])}. That night carries most of the week's I/O.`,
+        fix: "spread full backup days across the week.",
+        occ: nights.map(([di, rs]) => ({ start: Math.min(...rs.map(r => r.start)), label: `${fmtDay(di)} · ${rs.length} fulls` })), focus: Math.min(...worst[1].map(r => r.start)) });
+    }
+  }
+
+  const sevRank = { crit: 0, warn: 1, info: 2 };
+  conflicts.sort((a, b) => sevRank[a.sev] - sevRank[b.sev] || a.title.localeCompare(b.title));
+
+  // summary stats
+  let busiest = null;
+  for (const [key, p] of pressure) {
+    if (!key.startsWith("repo:") || !p.cap) continue;
+    const pk = p.segs.filter(s => s.b > 0 && s.a < END).reduce((m, s) => Math.max(m, s.d), 0);
+    const ratio = pk / p.cap;
+    if (!busiest || ratio > busiest.ratio) busiest = { key, peak: pk, cap: p.cap, ratio, repo: repoById(key.slice(5)) };
+  }
+  let latest = null;
+  for (const r of all) {
+    if (r.start < 0 || r.start >= END) continue;
+    const job = jobById(r.jobId); if (["periodic", "continuous"].includes(job.schedule?.type) || isSys(job)) continue;
+    const night = Math.floor((r.start - 720) / 1440);
+    const endRel = r.end - (night * 1440 + 720); // minutes after noon of night start
+    if (!latest || endRel > latest.rel) latest = { rel: endRel, end: r.end, run: r };
+  }
+  let busiestHost = null;
+  for (const h of (S.data.hosts || [])) {
+    const segs = (hostLoad.get(h.id) || []).filter(x => x.b > 0 && x.a < END);
+    const pk = segs.reduce((m, x) => Math.max(m, x.cores), 0);
+    const ratio = h.cores ? pk / h.cores : 0;
+    if (pk && (!busiestHost || ratio > busiestHost.ratio || (!busiestHost.ratio && pk > busiestHost.peak))) busiestHost = { h, peak: pk, ratio };
+  }
+  S.sim = { runsByJob, all, conflicts, pressure, resources, busiest, busiestHost, latest, END, hostLoad };
+}
+
+function allowedAt(job, min) {
+  const w = job.schedule?.window;
+  if (!w || !w.enabled || !w.allowed) return true;
+  const dt = dateOf(Math.floor(min / 1440));
+  const h = Math.floor((((min % 1440) + 1440) % 1440) / 60);
+  const row = w.allowed[dayName(dt)];
+  return !row || row[h] !== false;
+}
+function firstDenied(job, a, b) {
+  let m = a;
+  while (m < b) { if (!allowedAt(job, m)) return Math.max(a, Math.floor(m / 60) * 60); m = (Math.floor(m / 60) + 1) * 60; }
+  return null;
+}
+function prodOverlap(a, b) {
+  const p = S.settings.prod;
+  for (let di = Math.floor(a / 1440); di <= Math.floor(b / 1440); di++) {
+    if (!p.days.includes(dayName(dateOf(di)))) continue;
+    const s = di * 1440 + p.start, e = di * 1440 + p.end;
+    if (a < e && b > s && di >= 0 && di < S.settings.horizon) return Math.max(a, s);
+  }
+  return null;
+}
+function hostRoles(h) {
+  const r = [];
+  if (h.isBackupServer) r.push("backup server");
+  (S.data.proxies || []).filter(p => p.hostId === h.id).forEach(p => r.push(`${p.type === "HyperV" ? "Hyper-V" : p.type} proxy (${p.maxTasks || "no"} tasks)`));
+  for (const repo of S.data.repositories) {
+    if (repo.hostId === h.id) r.push(`repository ${nm(repo)} (${repo.maxTasks || "no"} tasks)`);
+    (repo.extents || []).filter(e => e && e.hostId === h.id).forEach(e => r.push(`extent ${e.name || ""} of ${nm(repo)} (${e.maxTasks || "no"} tasks)`));
+    if ((repo.gatewayIds || []).includes(h.id)) r.push(`gateway for ${nm(repo)}`);
+    if (repo.mountServerId === h.id) r.push(`mount server for ${nm(repo)}`);
+  }
+  return [...new Set(r)];
+}
+function topWindow(pr) {
+  let best = 0, bi = 0;
+  pr.forEach((v, i) => { if (v > best) { best = v; bi = i; } });
+  let a = bi, b = bi;
+  while (pr[(a + 167) % 168] >= best * 0.5 && (a + 167) % 168 !== bi) a = (a + 167) % 168;
+  while (pr[(b + 1) % 168] >= best * 0.5 && (b + 1) % 168 !== a) b = (b + 1) % 168;
+  const lab = i => `${DAB[Math.floor(i / 24)]} ${pad(i % 24)}:00`;
+  const daily = DAYS.every((_, d) => pr[d * 24 + (bi % 24)] >= best * 0.5);
+  return daily ? `every day from ${pad(a % 24)}:00 to ${pad((b + 1) % 24)}:00` : `from ${lab(a)} to ${lab((b + 1) % 168)}`;
+}
+function usesProxy(job) { return ["Backup", "Replica"].includes(job.type) && ["VMware", "HyperV"].includes(job.platform || "VMware"); }
+function proxyKey(job) {
+  const px = S.data.proxies || [];
+  if (job.proxyAuto !== false || !(job.proxyIds || []).length) {
+    const plat = job.platform || "VMware";
+    const set = px.filter(p => (p.type || "VMware") === plat);
+    if (!set.length) return null;
+    return { key: "pool:auto:" + plat, label: `${plat === "HyperV" ? "Hyper-V" : plat} proxies`, cap: set.reduce((a, p) => a + (+p.maxTasks || 0), 0) };
+  }
+  const set = px.filter(p => job.proxyIds.includes(p.id));
+  if (!set.length) return null;
+  const ids = set.map(p => p.id).sort();
+  return { key: "pool:" + ids.join(","), label: set.map(p => nm(p)).join(" + "), cap: set.reduce((a, p) => a + (+p.maxTasks || 0), 0) };
+}
+
+// ---------- rendering ----------
+const tl = $("#tl"), pane = $("#pane"), tip = $("#tip");
+
+function rowsModel() {
+  const st = S.settings;
+  const jobs = S.data.jobs.filter(j => st.showOff || (j.enabled !== false && j.scheduleEnabled !== false));
+  const firstStart = j => { const r = (S.sim.runsByJob.get(j.id) || []).find(r => r.start >= 0); return r ? (r.start % 1440 + 1440 - 720) % 1440 : 99999; };
+  const sortJobs = list => list.slice().sort((a, b) => firstStart(a) - firstStart(b) || a.name.localeCompare(b.name));
+  const rows = [];
+  if (st.group === "repo") {
+    for (const repo of S.data.repositories) {
+      const js = jobs.filter(j => j.repositoryId === repo.id);
+      if (!js.length) continue;
+      rows.push({ kind: "grp", repo, key: "repo:" + repo.id });
+      sortJobs(js).forEach(j => rows.push({ kind: "job", job: j }));
+    }
+    const orphan = jobs.filter(j => !repoById(j.repositoryId));
+    if (orphan.length) { rows.push({ kind: "grp", label: "No repository", key: null }); sortJobs(orphan).forEach(j => rows.push({ kind: "job", job: j })); }
+    const pools = [...S.sim.resources.values()].filter(r => r.pool);
+    if (pools.length) { rows.push({ kind: "grp", label: "Proxy pools", key: null, meta: "Task slots across proxies" }); pools.forEach(p => rows.push({ kind: "pool", res: p })); }
+  } else {
+    const types = [...new Set(jobs.map(j => j.type || "Other"))];
+    const pools = [...S.sim.resources.values()].filter(r => r.pool);
+    S._pools = pools;
+    for (const t of types) {
+      rows.push({ kind: "grp", label: TYPE_LABEL[t] || t, key: null, meta: `${jobs.filter(j => (j.type || "Other") === t).length} jobs` });
+      sortJobs(jobs.filter(j => (j.type || "Other") === t)).forEach(j => rows.push({ kind: "job", job: j }));
+    }
+    if (pools.length) { rows.push({ kind: "grp", label: "Proxy pools", key: null, meta: "Task slots across proxies" }); pools.forEach(p => rows.push({ kind: "pool", res: p })); }
+  }
+  const hosts = S.data.hosts || [];
+  if (hosts.length) { rows.push({ kind: "grp", label: "Servers", key: null, meta: "CPU need from proxy, repository and gateway tasks" }); hosts.forEach(h => rows.push({ kind: "host", host: h })); }
+  const acts = (S.data.activity || []).filter(a => Array.isArray(a.profile) && a.profile.length === 168);
+  if (acts.length) { rows.push({ kind: "grp", label: "Background activity", key: null, meta: `Observed over the last ${S.data.historyDays || "?"} days` }); acts.forEach(a => rows.push({ kind: "act", act: a })); }
+  if (st.view === "jobs") return rows.filter(r => r.kind === "job" || (r.kind === "grp" && r.repo) || (r.kind === "grp" && !r.repo && !["Servers", "Background activity", "Proxy pools"].includes(r.label)));
+  if (st.view === "infra") return rows.filter(r => r.kind !== "job" && !(r.kind === "grp" && !r.repo && !["Servers", "Background activity", "Proxy pools"].includes(r.label)));
+  return rows;
+}
+
+function schedText(job) {
+  const sc = job.schedule || {};
+  switch (sc.type) {
+    case "daily": return `${sc.time} ${dayList(sc.days)}`;
+    case "monthly": return `${(sc.monthly || {}).time || sc.time || ""} ${monthlyText(sc.monthly)}`;
+    case "periodic": return `every ${dur(+(sc.periodic || {}).everyMinutes || 60)}`;
+    case "continuous": return "continuous";
+    case "after": return `after ${nm(jobById(sc.afterJobId))}`;
+    case "immediate": return "immediate copy";
+    default: return "not scheduled";
+  }
+}
+function dayList(days) {
+  if (!days || days.length === 7) return "daily";
+  if (days.length === 5 && DAYS.slice(0, 5).every(d => days.includes(d))) return "weekdays";
+  return days.map(d => d.slice(0, 3)).join(" ");
+}
+
+function render() {
+  simulate();
+  renderServer(); renderSummary(); bindTiles(); renderTimeline(); renderPane(); renderCounts();
+}
+
+function renderServer() {
+  const s = S.data.server || {};
+  const el = $("#server");
+  const srv = S.settings.anon && !S.data.anonymized ? "vbr-server" : (s.name || "VBR");
+  el.innerHTML = `<span class="pill mono">${esc(srv)}</span>` +
+    (s.version ? `<span class="pill">v${esc(s.version)}</span>` : "") +
+    (s.timezone ? `<span class="pill">${esc(s.timezone)}</span>` : "") +
+    `<span class="pill">${S.data.jobs.length} jobs · ${S.data.historyDays || "?"} days of history</span>` +
+    (S.isSample ? `<span class="pill sample">Sample data</span>` : "") +
+    (S.data.anonymized ? `<span class="pill">Anonymized export</span>` : "");
+}
+
+function renderSummary() {
+  const sim = S.sim, c = sim.conflicts;
+  const n = sev => c.filter(x => x.sev === sev).length;
+  const runs = sim.all.filter(r => r.start >= 0 && r.start < sim.END).length;
+  const activeJobs = S.data.jobs.filter(j => j.enabled !== false).length;
+  const b = sim.busiest, l = sim.latest;
+  $("#summary").innerHTML = `
+    <div class="tile tap" id="tileHost" role="button" tabindex="0" title="Show servers"><div class="k">Busiest server</div>${sim.busiestHost ? `<div class="v">${sim.busiestHost.peak.toFixed(1)} <small>${sim.busiestHost.h.cores ? `of ${sim.busiestHost.h.cores} cores at peak` : "cores at peak"}</small></div><div class="s">${esc(nm(sim.busiestHost.h))} · ${runs.toLocaleString()} runs from ${activeJobs} jobs in view</div>` : `<div class="v">${runs.toLocaleString()} <small>runs</small></div><div class="s">${activeJobs} active jobs over ${S.settings.horizon} days</div>`}</div>
+    <div class="tile"><div class="k">Conflicts</div><div class="v">${n("crit") + n("warn")} <small>to fix</small></div>
+      <div class="sev-row"><span class="sev crit">${n("crit")} critical</span><span class="sev warn">${n("warn")} warning</span><span class="sev info">${n("info")} info</span></div></div>
+    <div class="tile"><div class="k">Busiest repository</div>${b ? `<div class="v">${b.peak} <small>of ${b.cap} slots at peak</small></div><div class="s">${esc(nm(b.repo))}</div>` : `<div class="v">None</div>`}</div>
+    <div class="tile"><div class="k">Latest finish</div>${l ? `<div class="v mono">${hhmm(l.end)}</div><div class="s">${esc(nm(jobById(l.run.jobId)))} on ${fmtDay(Math.floor(l.end / 1440))}</div>` : `<div class="v">None</div>`}</div>`;
+}
+
+function bindTiles() {
+  const t = $("#tileHost"); if (!t || !S.sim.busiestHost) return;
+  const go = () => {
+    setView("infra");
+    const c = S.sim.conflicts.find(x => x.hostId === S.sim.busiestHost.h.id);
+    if (c) { setTab("conf"); focusConflict(c.id); }
+    else { S.selHost = S.sim.busiestHost.h.id; S.tab = "host"; renderPane(); }
+  };
+  t.addEventListener("click", go);
+  t.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+}
+
+function renderCounts() {
+  const c = S.sim.conflicts.filter(x => x.sev !== "info").length;
+  const el = $("#cntConf"); el.textContent = c; el.classList.toggle("hot", S.sim.conflicts.some(x => x.sev === "crit"));
+  $("#cntChg").textContent = changes().length;
+}
+
+function renderTimeline() {
+  LABW = window.innerWidth < 600 ? 150 : 230;
+  const st = S.settings, px = st.pxh / 60, H = st.horizon, W = H * 1440 * px;
+  const rows = rowsModel();
+  const keepX = tl.scrollLeft, keepY = tl.scrollTop;
+  const selConf = S.selConf ? S.sim.conflicts.find(c => c.id === S.selConf) : null;
+  const hlJobs = new Set(selConf ? selConf.jobIds : S.sel ? [S.sel] : []);
+  const parts = [];
+  parts.push(`<div class="tl-inner" style="--labw:${LABW}px;width:${LABW + W}px">`);
+  // axis
+  let ax = `<div class="row axis"><div class="lab">${st.est === "p90" ? "Slow night (p90)" : "Typical run"} · server time</div><div class="track" style="width:${W}px">`;
+  const step = st.pxh >= 40 ? 2 : st.pxh >= 16 ? 6 : 12;
+  for (let d = 0; d < H; d++) {
+    const dt = dateOf(d), we = ["Saturday", "Sunday"].includes(dayName(dt));
+    ax += `<div class="day${we ? " we" : ""}" style="left:${d * 1440 * px}px;width:${1440 * px}px">${st.pxh >= 8 ? fmtDay(d) : ""}</div>`;
+    for (let h = step; h < 24; h += step) ax += `<div class="hr" style="left:${(d * 1440 + h * 60) * px}px">${pad(h)}</div>`;
+  }
+  ax += `</div></div>`;
+  parts.push(ax);
+  // background layer
+  let bg = `<div class="bg" style="left:${LABW}px;top:42px;width:${W}px;bottom:0;background-image:repeating-linear-gradient(to right, var(--grid) 0 1px, transparent 1px ${st.pxh * step}px)">`;
+  for (let d = 0; d < H; d++) {
+    const dt = dateOf(d), dn = dayName(dt);
+    if (dn === "Saturday" || dn === "Sunday") bg += `<div class="we" style="left:${d * 1440 * px}px;width:${1440 * px}px"></div>`;
+    if (st.prod.days.includes(dn) && st.prod.end > st.prod.start) bg += `<div class="prod" style="left:${(d * 1440 + st.prod.start) * px}px;width:${(st.prod.end - st.prod.start) * px}px"></div>`;
+    bg += `<div class="dcol" style="left:${d * 1440 * px}px"></div>`;
+  }
+  bg += `</div>`;
+  parts.push(bg);
+
+  for (const row of rows) {
+    if (row.kind === "grp") {
+      const repo = row.repo;
+      const p = row.key ? S.sim.pressure.get(row.key) : null;
+      const meta = repo ? `${esc(repo.type || "")}${repo.maxTasks ? ` · ${repo.maxTasks} task slots` : " · no task limit"}` : esc(row.meta || "");
+      parts.push(`<div class="row grp"${repo ? ` data-repo="${esc(repo.id)}"` : ""}><div class="lab" title="${repo ? "Edit task slots" : ""}"><div class="n">${esc(repo ? nm(repo) : row.label)}</div><div class="m">${meta}</div></div><div class="track" style="width:${W}px">${p ? heat(p, px) : ""}</div></div>`);
+    } else if (row.kind === "host") {
+      const h = row.host, segs = S.sim.hostLoad.get(h.id) || [];
+      const peak = segs.reduce((m, x) => Math.max(m, x.cores), 0) || 1;
+      let hh = `<div class="heat" style="left:0;right:0">`;
+      for (const x of segs) {
+        if (x.b <= 0 || x.a >= H * 1440) continue;
+        const r = h.cores ? x.cores / h.cores : x.cores / peak * 0.6, lv = r > 1 ? 3 : r > 0.6 ? 2 : 1;
+        const a = Math.max(0, x.a), b = Math.min(H * 1440, x.b);
+        hh += `<i class="l${lv}" style="left:${a * px}px;width:${Math.max(1, (b - a) * px)}px" title="${x.cores.toFixed(1)} cores, ${Math.ceil(x.ram)} GB (${x.pt.toFixed(1)} proxy and ${x.rt.toFixed(1)} repository tasks)"></i>`;
+      }
+      hh += `</div>`;
+      const hw = h.cores || h.ramGB ? `${h.cores || "?"} cores · ${h.ramGB || "?"} GB` : "hardware unknown";
+      parts.push(`<div class="row host${S.selHost === h.id ? " sel" : ""}" data-host="${esc(h.id)}"><div class="lab" title="${esc(hostRoles(h).join(", "))}"><div class="n">${esc(nm(h))} · ${esc(hw)}</div><div class="m">${esc(hostRoles(h).join(", ") || "no Veeam roles found")}</div></div><div class="track" style="width:${W}px">${hh}</div></div>`);
+    } else if (row.kind === "act") {
+      const a = row.act, mx = Math.max(...a.profile) || 1;
+      let hh = `<div class="heat" style="left:0;right:0">`;
+      for (let d = 0; d < H; d++) {
+        const wd = DAYS.indexOf(dayName(dateOf(d)));
+        for (let h = 0; h < 24; h++) {
+          const v = a.profile[wd * 24 + h]; if (!(v > 0)) continue;
+          hh += `<i class="a" style="left:${(d * 1440 + h * 60) * px}px;width:${60 * px}px;opacity:${(0.2 + 0.8 * Math.min(1, v / mx)).toFixed(2)}" title="${fmtDay(d)} ${pad(h)}:00 · on average ${v.toFixed(1)} running"></i>`;
+        }
+      }
+      hh += `</div>`;
+      parts.push(`<div class="row act"><div class="lab" title="${esc(a.label)}"><div class="n">${esc(a.label)}</div><div class="m">${a.sessions || "?"} sessions · median ${dur(a.medianMin || 0)}</div></div><div class="track" style="width:${W}px">${hh}</div></div>`);
+    } else if (row.kind === "pool") {
+      const p = S.sim.pressure.get(row.res.key);
+      parts.push(`<div class="row pool"><div class="lab"><div class="n">${esc(row.res.label)} · ${row.res.cap} slots</div></div><div class="track" style="width:${W}px">${p ? heat(p, px) : ""}</div></div>`);
+    } else {
+      const job = row.job, off = job.enabled === false || job.scheduleEnabled === false;
+      const sel = S.sel === job.id;
+      let tr = "";
+      const w = job.schedule?.window;
+      if (w && w.enabled && w.allowed) {
+        for (let d = 0; d < H; d++) {
+          const hrs = w.allowed[dayName(dateOf(d))] || [];
+          let s = null;
+          for (let h = 0; h <= 24; h++) {
+            const den = h < 24 && hrs[h] === false;
+            if (den && s == null) s = h;
+            if (!den && s != null) { tr += `<div class="den" style="left:${(d * 1440 + s * 60) * px}px;width:${(h - s) * 60 * px}px"></div>`; s = null; }
+          }
+        }
+      }
+      const draggable = ["daily", "monthly", "periodic"].includes(job.schedule?.type);
+      for (const r of S.sim.runsByJob.get(job.id) || []) {
+        if (r.end <= 0 || r.start >= H * 1440) continue;
+        const x = Math.max(0, r.start * px), x2 = Math.min(W, r.end * px), bw = Math.max(2, x2 - x);
+        const total = r.end - r.start;
+        const flags = r.flags;
+        const crit = flags.has("window") || flags.has("self") || flags.has("copy");
+        const warnF = !crit && flags.has("prod") && !["periodic", "continuous"].includes(job.schedule?.type) && !isSys(job);
+        const cls = ["bar", isSys(job) ? "sys" : "", draggable ? "" : "nodrag", r.est ? "est" : "", crit ? "c-crit" : warnF ? "c-warn" : "", hlJobs.size && !hlJobs.has(job.id) ? "dim" : "", hlJobs.has(job.id) ? "hl" : ""].filter(Boolean).join(" ");
+        const segs = r.seg.map(s => `<i class="s ${s.k}" style="width:${(s.m / total) * 100}%"></i>`).join("");
+        const label = bw > 70 ? `<span class="t">${esc(r.kind === "active" ? "Full" : r.kind === "synthetic" ? "Synth" : hhmm(r.start))}</span>` : "";
+        tr += `<div class="${cls}" data-run="${r.id}" data-job="${esc(job.id)}" style="left:${x}px;width:${bw}px">${segs}${label}</div>`;
+      }
+      if (off) tr += `<div class="lab-off" style="position:absolute;left:8px;top:6px;font-size:12px;color:var(--faint)">Disabled. Not included in the plan.</div>`;
+      parts.push(`<div class="row job${sel ? " sel" : ""}${off ? " off" : ""}" data-jobrow="${esc(job.id)}"><div class="lab"><div class="n">${esc(nm(job))}</div><div class="m">${esc(typeLabel(job))} · ${esc(schedText(job))}</div></div><div class="track" style="width:${W}px">${tr}</div></div>`);
+    }
+  }
+  parts.push(`</div>`);
+  tl.innerHTML = parts.join("");
+  tl.scrollLeft = keepX; tl.scrollTop = keepY;
+}
+
+function heat(p, px) {
+  if (!p.cap) return "";
+  let h = `<div class="heat" style="left:0;right:0">`;
+  for (const s of p.segs) {
+    if (s.b <= 0 || s.a >= S.settings.horizon * 1440) continue;
+    const r = s.d / p.cap, lv = r > 1 ? 3 : r > 0.6 ? 2 : 1;
+    const a = Math.max(0, s.a), b = Math.min(S.settings.horizon * 1440, s.b);
+    h += `<i class="l${lv}" style="left:${a * px}px;width:${Math.max(1, (b - a) * px)}px" title="${s.d} of ${p.cap} slots"></i>`;
+  }
+  return h + `</div>`;
+}
+
+// ---------- side panel ----------
+function setTab(t) {
+  S.tab = t;
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  renderPane();
+}
+function renderPane() {
+  if (S.tab === "conf") return paneConflicts();
+  if (S.tab === "job") return paneJob();
+  if (S.tab === "chg") return paneChanges();
+  if (S.tab === "repo") return paneRepo();
+  if (S.tab === "host") return paneHost();
+  return paneSettings();
+}
+
+function paneConflicts() {
+  const c = S.sim.conflicts;
+  if (!c.length) { pane.innerHTML = `<div class="empty">No conflicts in this view. Try <b>Slow night (p90)</b> to test the plan against slower runs.</div>`; return; }
+  pane.innerHTML = c.map(x => `
+    <div class="cf ${x.sev}${S.selConf === x.id ? " on" : ""}" data-conf="${esc(x.id)}" tabindex="0" role="button" aria-pressed="${S.selConf === x.id}">
+      <div class="stripe"></div>
+      <div>
+        <h4>${esc(x.title)}</h4>
+        <p>${esc(x.detail)}</p>
+        ${x.occ.length ? `<div class="chips">${x.occ.slice(0, 4).map(o => `<span class="chip">${esc(o.label)}</span>`).join("")}${x.occ.length > 4 ? `<span class="chip">+${x.occ.length - 4} more</span>` : ""}</div>` : ""}
+        ${x.fix ? `<div class="fix">${esc(x.fix)}</div>` : ""}
+      </div>
+    </div>`).join("") + `<p class="note">Times are predicted from run history. Slot pressure assumes each job uses up to one task per machine, capped at the repository limit. Set a different value per job in the Job tab.</p>`;
+}
+
+function dayBoxes(name, sel) {
+  return `<div class="days">${DAYS.map((d, i) => `<label><input type="checkbox" data-f="${name}" value="${d}"${(sel || []).includes(d) ? " checked" : ""} aria-label="${d}"><span>${DAB[i]}</span></label>`).join("")}</div>`;
+}
+
+function paneJob() {
+  const job = S.sel ? jobById(S.sel) : null;
+  if (!job) { pane.innerHTML = `<div class="empty">Click a job name or a bar in the timeline to inspect it. Drag a bar sideways to try a new start time.</div>`; return; }
+  const sc = job.schedule || {}, f = job.fulls || {}, d = durations(job), h = job.history || {}, ov = job.override || {};
+  const repo = repoById(job.repositoryId);
+  const runs = (S.sim.runsByJob.get(job.id) || []).filter(r => r.start >= 0 && r.start < S.sim.END);
+  const myConf = S.sim.conflicts.filter(c => c.jobIds.includes(job.id) && c.sev !== "info");
+  const others = S.data.jobs.filter(j => j.id !== job.id);
+  let sched = "";
+  if (sc.type === "daily") sched = `<label class="fld"><span>Start time</span><input type="time" id="fTime" value="${esc(sc.time)}" step="300"></label><div class="fld"><span>Run on</span>${dayBoxes("days", sc.days)}</div>`;
+  else if (sc.type === "monthly") sched = `<label class="fld"><span>Start time</span><input type="time" id="fTime" value="${esc((sc.monthly || {}).time || sc.time)}" step="300"><span class="hint">Runs on the ${esc(monthlyText(sc.monthly))}.</span></label>`;
+  else if (sc.type === "periodic") sched = `<label class="fld"><span>Run every (minutes)</span><input type="number" id="fEvery" min="5" step="5" value="${esc((sc.periodic || {}).everyMinutes)}"></label><label class="fld"><span>Offset from midnight (minutes)</span><input type="number" id="fOffset" min="0" max="1439" step="5" value="${esc((sc.periodic || {}).offsetMinutes || 0)}"></label>`;
+  else if (sc.type === "after") sched = `<label class="fld"><span>Runs after</span><select id="fAfter">${others.map(o => `<option value="${esc(o.id)}"${o.id === sc.afterJobId ? " selected" : ""}>${esc(nm(o))}</option>`).join("")}</select></label>`;
+  else if (sc.type === "immediate") sched = `<div class="fld"><span>Copies from</span><div class="hint">${(job.sourceJobIds || []).map(id => esc(nm(jobById(id)))).join(", ") || "No source jobs"}. Starts as soon as each source finishes.</div></div>`;
+  const act = f.active || {}, syn = f.synthetic || {};
+  pane.innerHTML = `<div class="ed">
+    <h3>${esc(nm(job))}</h3>
+    <div class="sub">${esc(typeLabel(job))} · ${esc(SCHED_LABEL[sc.type] || sc.type)} · ${esc(nm(repo))} · ${job.objectCount || "?"} objects${job.sourceSizeGB ? ` · ${Math.round(job.sourceSizeGB).toLocaleString()} GB` : ""}</div>
+    <div class="stats">
+      <div><b>${dur(d.inc)}${d.incEst ? "*" : ""}</b><span>Incremental</span></div>
+      <div><b>${dur(d.full)}${d.fullEst ? "*" : ""}</b><span>Full</span></div>
+      <div><b>${runs.length}</b><span>Runs in view</span></div>
+    </div>
+    ${myConf.length ? `<div class="chips" style="margin:-4px 0 12px">${myConf.map(c => `<span class="sev ${c.sev}">${esc(c.type === "slots" ? "Slot pressure" : c.type === "window" ? "Past window" : c.type === "prod" ? "Production hours" : c.type === "copy" ? "Copy too early" : c.type === "self" ? "Overlaps itself" : c.type === "fulls" ? "Full pile-up" : c.type === "act" ? "Background activity" : c.type === "host" ? "Server load" : "Window")}</span>`).join("")}</div>` : ""}
+    <label class="fld tog"><input type="checkbox" id="fEnabled"${job.enabled !== false ? " checked" : ""}> Job enabled</label>
+    ${sched}
+    ${job.type !== "BackupCopy" && !isSys(job) ? `
+    <div class="fld"><span>Active full</span>
+      <label class="tog"><input type="checkbox" id="fActOn"${act.enabled ? " checked" : ""}> ${act.kind === "monthly" ? `Monthly, ${esc(monthlyText(act.monthly))}` : "Weekly on"}</label>
+      ${act.kind !== "monthly" ? dayBoxes("act", act.days) : ""}
+    </div>
+    <div class="fld"><span>Synthetic full</span>
+      <label class="tog"><input type="checkbox" id="fSynOn"${syn.enabled ? " checked" : ""}> Weekly on</label>
+      ${dayBoxes("syn", syn.days)}
+    </div>` : ""}
+    <label class="fld"><span>Repository</span><select id="fRepo">${S.data.repositories.map(r => `<option value="${esc(r.id)}"${r.id === job.repositoryId ? " selected" : ""}>${esc(nm(r))} (${r.maxTasks || "no"} slots)</option>`).join("")}</select></label>
+    <label class="fld"><span>Parallel tasks</span><input type="number" id="fTasks" min="1" placeholder="${tasksFor({ objectCount: job.objectCount }, repo && repo.maxTasks)} (automatic)" value="${esc(ov.tasks ?? "")}"><span class="hint">How many slots this job takes while it runs.</span></label>
+    <label class="fld"><span>Incremental duration (minutes)</span><input type="number" id="fDur" min="1" placeholder="${Math.round(d.incEst ? d.inc : (S.settings.est === "p90" ? (h.incP90Min ?? d.inc) : (h.incMedianMin ?? d.inc)))} (from ${d.incEst ? "estimate" : "history"})" value="${esc(ov.durationMin ?? "")}"><span class="hint">${h.runs ? `${h.runs} runs in history. Median ${dur(h.incMedianMin || 0)}, p90 ${dur(h.incP90Min || 0)}.` : "No history. Values marked * are estimates."}</span></label>
+    <div class="acts">
+      <button class="btn" type="button" id="fReset">Reset this job</button>
+      <button class="btn ghost" type="button" id="fClose">Close</button>
+    </div>
+  </div>`;
+  bindJobEditor(job);
+}
+
+function bindJobEditor(job) {
+  const commit = () => { render(); };
+  const on = (id, ev, fn) => { const el = $("#" + id, pane); if (el) el.addEventListener(ev, fn); };
+  on("fEnabled", "change", e => { job.enabled = e.target.checked; commit(); });
+  on("fTime", "change", e => { if (!e.target.value) return; if (job.schedule.type === "monthly") { job.schedule.monthly = job.schedule.monthly || {}; job.schedule.monthly.time = e.target.value; } else job.schedule.time = e.target.value; commit(); });
+  on("fEvery", "change", e => { job.schedule.periodic = job.schedule.periodic || {}; job.schedule.periodic.everyMinutes = Math.max(5, +e.target.value || 60); commit(); });
+  on("fOffset", "change", e => { job.schedule.periodic = job.schedule.periodic || {}; job.schedule.periodic.offsetMinutes = Math.max(0, +e.target.value || 0); commit(); });
+  on("fAfter", "change", e => { job.schedule.afterJobId = e.target.value; commit(); });
+  on("fActOn", "change", e => { job.fulls = job.fulls || {}; job.fulls.active = job.fulls.active || { kind: "weekly", days: [] }; job.fulls.active.enabled = e.target.checked; commit(); });
+  on("fSynOn", "change", e => { job.fulls = job.fulls || {}; job.fulls.synthetic = job.fulls.synthetic || { days: [] }; job.fulls.synthetic.enabled = e.target.checked; commit(); });
+  on("fRepo", "change", e => { job.repositoryId = e.target.value; commit(); });
+  on("fTasks", "change", e => { job.override = job.override || {}; job.override.tasks = e.target.value === "" ? null : Math.max(1, +e.target.value); commit(); });
+  on("fDur", "change", e => { job.override = job.override || {}; job.override.durationMin = e.target.value === "" ? null : Math.max(1, +e.target.value); commit(); });
+  on("fReset", "click", () => { const o = origJob(job.id); Object.keys(job).forEach(k => delete job[k]); Object.assign(job, clone(o)); commit(); });
+  on("fClose", "click", () => { S.sel = null; setTab("conf"); render(); });
+  pane.querySelectorAll("input[data-f]").forEach(cb => cb.addEventListener("change", () => {
+    const vals = [...pane.querySelectorAll(`input[data-f="${cb.dataset.f}"]:checked`)].map(x => x.value);
+    if (cb.dataset.f === "days") job.schedule.days = vals;
+    if (cb.dataset.f === "act") { job.fulls.active = job.fulls.active || { kind: "weekly" }; job.fulls.active.kind = "weekly"; job.fulls.active.days = vals; if (vals.length) job.fulls.active.enabled = true; }
+    if (cb.dataset.f === "syn") { job.fulls.synthetic = job.fulls.synthetic || {}; job.fulls.synthetic.days = vals; if (vals.length) job.fulls.synthetic.enabled = true; }
+    commit();
+  }));
+}
+
+function paneRepo() {
+  const repo = S.selRepo ? repoById(S.selRepo) : null;
+  if (!repo) return setTab("conf");
+  const o = S.orig.repositories.find(r => r.id === repo.id) || {};
+  const jobs = S.data.jobs.filter(j => j.repositoryId === repo.id);
+  pane.innerHTML = `<div class="ed"><h3>${esc(nm(repo))}</h3><div class="sub">${esc(repo.type || "Repository")} · ${jobs.length} jobs${repo.extents ? ` · ${repo.extents.length} extents` : ""}</div>
+    <label class="fld"><span>Concurrent task limit</span><input type="number" id="rTasks" min="1" value="${esc(repo.maxTasks || "")}"><span class="hint">Was ${o.maxTasks || "unlimited"} in the export. Raise it only if the repository has the CPU, RAM and disk throughput to match.</span></label>
+    <div class="acts"><button class="btn" type="button" id="rReset">Reset</button><button class="btn ghost" type="button" id="rClose">Close</button></div></div>`;
+  $("#rTasks", pane).addEventListener("change", e => { repo.maxTasks = Math.max(1, +e.target.value || 1); render(); });
+  $("#rReset", pane).addEventListener("click", () => { repo.maxTasks = o.maxTasks; render(); });
+  $("#rClose", pane).addEventListener("click", () => { S.selRepo = null; setTab("conf"); render(); });
+}
+
+function paneHost() {
+  const h = S.selHost ? (S.data.hosts || []).find(x => x.id === S.selHost) : null;
+  if (!h) return setTab("conf");
+  const o = (S.orig.hosts || []).find(x => x.id === h.id) || {};
+  const segs = (S.sim.hostLoad.get(h.id) || []).filter(x => x.b > 0 && x.a < S.sim.END);
+  const pk = segs.reduce((m, x) => x.cores > m.cores ? x : m, { cores: 0, ram: 0, pt: 0, rt: 0, a: 0 });
+  const pkR = segs.reduce((m, x) => Math.max(m, x.ram), 0);
+  pane.innerHTML = `<div class="ed"><h3>${esc(nm(h))}</h3><div class="sub">${esc(h.os || "Server")}${h.isBackupServer ? " · backup server" : ""}</div>
+    <div class="stats"><div><b>${pk.cores.toFixed(1)}</b><span>Peak cores</span></div><div><b>${Math.ceil(pkR)} GB</b><span>Peak RAM</span></div><div><b>${pk.cores ? fmtAt(pk.a).slice(0, 10) : "None"}</b><span>Peak at</span></div></div>
+    <div class="fld"><span>Veeam roles</span><div class="hint">${esc(hostRoles(h).join(", ") || "None found in the export")}</div></div>
+    <label class="fld"><span>CPU cores</span><input type="number" id="hCores" min="1" value="${esc(h.cores ?? "")}" placeholder="unknown"></label>
+    <label class="fld"><span>RAM (GB)</span><input type="number" id="hRam" min="1" value="${esc(h.ramGB ?? "")}" placeholder="unknown"><span class="hint">${o.cores || o.ramGB ? `Export said ${o.cores || "?"} cores and ${o.ramGB || "?"} GB.` : "The export had no hardware for this server."} Sizing rules are under Assumptions.</span></label>
+    <div class="acts"><button class="btn" type="button" id="hReset">Reset</button><button class="btn ghost" type="button" id="hClose">Close</button></div></div>`;
+  $("#hCores", pane).addEventListener("change", e => { h.cores = e.target.value === "" ? null : Math.max(1, +e.target.value); render(); });
+  $("#hRam", pane).addEventListener("change", e => { h.ramGB = e.target.value === "" ? null : Math.max(1, +e.target.value); render(); });
+  $("#hReset", pane).addEventListener("click", () => { h.cores = o.cores ?? null; h.ramGB = o.ramGB ?? null; render(); });
+  $("#hClose", pane).addEventListener("click", () => { S.selHost = null; setTab("conf"); render(); });
+}
+
+function changes() {
+  if (!S.orig) return [];
+  const out = [];
+  for (const j of S.data.jobs) {
+    const o = origJob(j.id); if (!o) continue;
+    const n = nm(j), sc = j.schedule || {}, os = o.schedule || {};
+    if ((j.enabled !== false) !== (o.enabled !== false)) out.push({ who: n, what: j.enabled !== false ? "Enable the job" : "Disable the job" });
+    if (sc.time !== os.time && sc.type === "daily") out.push({ who: n, what: "Start time", from: os.time, to: sc.time });
+    if (sc.type === "monthly" && (sc.monthly || {}).time !== (os.monthly || {}).time) out.push({ who: n, what: "Start time", from: (os.monthly || {}).time, to: (sc.monthly || {}).time });
+    if (JSON.stringify(sc.days || []) !== JSON.stringify(os.days || [])) out.push({ who: n, what: "Run days", from: dayList(os.days), to: dayList(sc.days) });
+    if (JSON.stringify(sc.periodic || {}) !== JSON.stringify(os.periodic || {})) out.push({ who: n, what: "Periodic schedule", from: `every ${(os.periodic || {}).everyMinutes}m +${(os.periodic || {}).offsetMinutes || 0}m`, to: `every ${(sc.periodic || {}).everyMinutes}m +${(sc.periodic || {}).offsetMinutes || 0}m` });
+    if (sc.afterJobId !== os.afterJobId) out.push({ who: n, what: "Run after", from: nm(jobById(os.afterJobId)), to: nm(jobById(sc.afterJobId)) });
+    const fa = (j.fulls || {}).active || {}, oa = (o.fulls || {}).active || {};
+    if (!!fa.enabled !== !!oa.enabled || JSON.stringify(fa.days || []) !== JSON.stringify(oa.days || [])) out.push({ who: n, what: "Active full", from: oa.enabled ? (oa.kind === "monthly" ? monthlyText(oa.monthly) : dayList(oa.days)) : "off", to: fa.enabled ? (fa.kind === "monthly" ? monthlyText(fa.monthly) : dayList(fa.days)) : "off" });
+    const fs = (j.fulls || {}).synthetic || {}, osy = (o.fulls || {}).synthetic || {};
+    if (!!fs.enabled !== !!osy.enabled || JSON.stringify(fs.days || []) !== JSON.stringify(osy.days || [])) out.push({ who: n, what: "Synthetic full", from: osy.enabled ? dayList(osy.days) : "off", to: fs.enabled ? dayList(fs.days) : "off" });
+    if (j.repositoryId !== o.repositoryId) out.push({ who: n, what: "Repository", from: nm(repoById(o.repositoryId)), to: nm(repoById(j.repositoryId)) });
+    const ov = j.override || {};
+    if (ov.tasks != null) out.push({ who: n, what: "Assumed parallel tasks", to: String(ov.tasks), note: "planning assumption" });
+    if (ov.durationMin != null) out.push({ who: n, what: "Assumed incremental duration", to: dur(ov.durationMin), note: "planning assumption" });
+  }
+  for (const h of (S.data.hosts || [])) {
+    const o = (S.orig.hosts || []).find(x => x.id === h.id);
+    if (o && (o.cores !== h.cores || o.ramGB !== h.ramGB)) out.push({ who: nm(h), what: "Server hardware", to: `${h.cores || "?"} cores, ${h.ramGB || "?"} GB`, note: "planning assumption" });
+  }
+  for (const r of S.data.repositories) {
+    const o = S.orig.repositories.find(x => x.id === r.id);
+    if (o && +o.maxTasks !== +r.maxTasks) out.push({ who: nm(r), what: "Concurrent task limit", from: String(o.maxTasks || "unlimited"), to: String(r.maxTasks) });
+  }
+  return out;
+}
+
+function planText() {
+  const ch = changes();
+  const c = S.sim.conflicts;
+  const lines = [`# Nightshift change plan`, ``, `Server ${S.settings.anon ? "vbr-server" : (S.data.server || {}).name || "VBR"}, view from ${S.settings.start} for ${S.settings.horizon} days, ${S.settings.est === "p90" ? "slow night (p90)" : "typical"} durations.`, ``];
+  ch.filter(x => !x.note).forEach(x => lines.push(`- [ ] **${x.who}** · ${x.what}${x.from != null ? `: ${x.from} → ${x.to}` : x.to ? `: ${x.to}` : ""}`));
+  const asm = ch.filter(x => x.note);
+  if (asm.length) { lines.push(``, `Planning assumptions (not VBR settings)`); asm.forEach(x => lines.push(`- ${x.who} · ${x.what} ${x.to}`)); }
+  lines.push(``, `Conflicts left after these changes: ${c.filter(x => x.sev === "crit").length} critical, ${c.filter(x => x.sev === "warn").length} warning.`);
+  return lines.join("\n");
+}
+
+function paneChanges() {
+  const ch = changes();
+  if (!ch.length) { pane.innerHTML = `<div class="empty">No changes yet. Drag a bar to a new start time, or edit a job in the Job tab. Every change is listed here so you can apply it in VBR afterwards.</div>`; return; }
+  pane.innerHTML = ch.map(x => `<div class="ch"><b>${esc(x.who)}</b> · ${esc(x.what)}${x.note ? ` <span class="pill">${esc(x.note)}</span>` : ""}<div class="d">${x.from != null ? `${esc(x.from)} → ${esc(x.to)}` : esc(x.to || "")}</div></div>`).join("") +
+    `<div class="acts" style="margin-top:12px"><button class="btn primary" type="button" id="cCopy">Copy as checklist</button>
+     ${S.confirmReset ? `<span class="confirm">Undo every change? <button class="btn danger" type="button" id="cYes">Yes, reset</button><button class="btn ghost" type="button" id="cNo">Keep</button></span>` : `<button class="btn ghost" type="button" id="cReset">Reset all</button>`}</div>
+     <textarea class="out" id="cOut" readonly aria-label="Change plan">${esc(planText())}</textarea>
+     <p class="note">Nightshift never writes to VBR. Apply the checklist in the console or with PowerShell, then run the collector again to confirm.</p>`;
+  $("#cCopy", pane).addEventListener("click", e => {
+    const t = planText(), btn = e.currentTarget;
+    const done = () => { btn.textContent = "Copied"; setTimeout(() => btn.textContent = "Copy as checklist", 1500); };
+    const fallback = () => { const ta = $("#cOut", pane); ta.focus(); ta.select(); btn.textContent = "Press Ctrl+C to copy"; };
+    try { navigator.clipboard.writeText(t).then(done, fallback); } catch (_) { fallback(); }
+  });
+  const r = $("#cReset", pane); if (r) r.addEventListener("click", () => { S.confirmReset = true; paneChanges(); });
+  const y = $("#cYes", pane); if (y) y.addEventListener("click", () => { S.data = clone(S.orig); S.confirmReset = false; render(); });
+  const n = $("#cNo", pane); if (n) n.addEventListener("click", () => { S.confirmReset = false; paneChanges(); });
+}
+
+function paneSettings() {
+  const st = S.settings;
+  pane.innerHTML = `<div class="ed">
+    <div class="fld"><span>Production hours</span>
+      <div style="display:flex;gap:8px;align-items:center"><input type="time" id="sPs" value="${hhmm(st.prod.start)}" step="900" style="width:auto"> to <input type="time" id="sPe" value="${hhmm(st.prod.end)}" step="900" style="width:auto"></div>
+      ${dayBoxes("prod", st.prod.days)}
+    </div>
+    <label class="fld"><span>Throughput for jobs without history (MB/s)</span><input type="number" id="sTp" min="10" value="${st.throughput}"></label>
+    <label class="fld"><span>Incremental as % of a full (no history)</span><input type="number" id="sInc" min="1" max="100" value="${st.incPct}"></label>
+    <label class="fld"><span>Synthetic full transform, % of a full</span><input type="number" id="sSyn" min="0" max="200" value="${st.synthPct}"><span class="hint">Fast-clone repositories (XFS, ReFS) usually need far less.</span></label>
+    <label class="fld"><span>Health check, % of a full</span><input type="number" id="sHc" min="0" max="200" value="${st.healthPct}"></label>
+    <div class="fld"><span>Server sizing per task</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <label class="hint">Proxy cores per task<input type="number" id="sPc" min="0.1" step="0.1" value="${st.proxyCores}"></label>
+        <label class="hint">Proxy GB RAM per task<input type="number" id="sPr" min="0.1" step="0.5" value="${st.proxyRam}"></label>
+        <label class="hint">Repository tasks per core<input type="number" id="sRt" min="1" step="1" value="${st.repoTasksPerCore}"></label>
+        <label class="hint">Repository GB RAM per core<input type="number" id="sRr" min="0.5" step="0.5" value="${st.repoRamPerCore}"></label>
+      </div>
+      <span class="hint">Defaults follow the Veeam best practice guide. Gateways count as repository tasks.</span>
+    </div>
+    <p class="note">Nightshift predicts. It reads schedules and real run times from the export, then lays them out against task slots, backup windows and your production hours. Background activity is drawn from what ran in the past, because VBR starts retention, maintenance and scans on its own. It doesn't model storage latency control, network throttling or retries, so treat a clean plan as likely, not guaranteed.</p>
+  </div>`;
+  const upd = () => {
+    st.prod.start = parseHM($("#sPs", pane).value) ?? st.prod.start; st.prod.end = parseHM($("#sPe", pane).value) ?? st.prod.end;
+    st.throughput = Math.max(10, +$("#sTp", pane).value || 250); st.incPct = Math.max(1, +$("#sInc", pane).value || 15);
+    st.synthPct = Math.max(0, +$("#sSyn", pane).value); st.healthPct = Math.max(0, +$("#sHc", pane).value);
+    st.proxyCores = Math.max(0.1, +$("#sPc", pane).value || 1); st.proxyRam = Math.max(0.1, +$("#sPr", pane).value || 2);
+    st.repoTasksPerCore = Math.max(1, +$("#sRt", pane).value || 3); st.repoRamPerCore = Math.max(0.5, +$("#sRr", pane).value || 4);
+    render();
+  };
+  pane.querySelectorAll("input").forEach(i => i.addEventListener("change", e => {
+    if (e.target.dataset.f === "prod") st.prod.days = [...pane.querySelectorAll('input[data-f="prod"]:checked')].map(x => x.value);
+    upd();
+  }));
+}
+
+// ---------- interactions ----------
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+pane.addEventListener("click", e => {
+  const c = e.target.closest("[data-conf]"); if (!c) return;
+  focusConflict(c.dataset.conf);
+});
+pane.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-conf]")) { e.preventDefault(); focusConflict(e.target.dataset.conf); } });
+
+function focusConflict(id) {
+  S.selConf = S.selConf === id ? null : id;
+  const c = S.sim.conflicts.find(x => x.id === id);
+  renderTimeline(); paneConflicts();
+  const on = pane.querySelector(".cf.on"); if (on) on.scrollIntoView({ block: "nearest" });
+  if (S.selConf && c) scrollToTime(c.focus, c.jobIds[0], c.hostId);
+}
+function scrollToTime(min, jobId, hostId) {
+  const px = S.settings.pxh / 60;
+  const row = jobId ? tl.querySelector(`[data-jobrow="${CSS.escape(jobId)}"]`) : hostId ? tl.querySelector(`[data-host="${CSS.escape(hostId)}"]`) : null;
+  const top = row ? Math.max(0, row.offsetTop - tl.clientHeight / 2) : tl.scrollTop;
+  tl.scrollTo({ left: Math.max(0, min * px - 160), top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  if (jobId) {
+    if (row) {
+      const bar = [...row.querySelectorAll(".bar")].find(b => Math.abs(parseFloat(b.style.left) - Math.max(0, min * px)) < 2);
+      if (bar) { bar.classList.add("flash"); setTimeout(() => bar.classList.remove("flash"), 1300); }
+    }
+  }
+}
+function selectJob(id) { S.sel = id; S.selConf = null; S.tab = "job"; document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === "job"))); renderTimeline(); renderPane(); }
+
+tl.addEventListener("click", e => {
+  if (dragState && dragState.moved) return;
+  const lab = e.target.closest(".row.job .lab"); if (lab) return selectJob(lab.parentElement.dataset.jobrow);
+  const hl = e.target.closest(".row.host .lab"); if (hl) { S.selHost = hl.parentElement.dataset.host; S.tab = "host"; document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", "false")); return renderPane(); }
+  const g = e.target.closest(".row.grp[data-repo] .lab"); if (g) { S.selRepo = g.parentElement.dataset.repo; S.tab = "repo"; document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", "false")); return renderPane(); }
+});
+
+// tooltip
+tl.addEventListener("pointermove", e => {
+  if (dragState) return;
+  const bar = e.target.closest(".bar");
+  if (!bar) { tip.hidden = true; return; }
+  const r = S.sim.all.find(x => x.id === +bar.dataset.run); if (!r) return;
+  const job = jobById(r.jobId), repo = repoById(job.repositoryId);
+  const kind = r.kind === "active" ? "Active full" : r.kind === "synthetic" ? "Synthetic full" : "Incremental";
+  const warn = [];
+  if (r.flags.has("window")) warn.push("Runs outside its backup window");
+  if (r.flags.has("self")) warn.push("Previous run still busy");
+  if (r.flags.has("copy")) warn.push("Source job still running");
+  if (r.flags.has("slots")) warn.push("Repository or proxy slots oversubscribed");
+  if (r.flags.has("prod")) warn.push("Runs into production hours");
+  if (r.flags.has("fulls")) warn.push("Shares the night with other fulls");
+  tip.innerHTML = `<b>${esc(nm(job))}</b><div class="r"><span>${kind}${r.health ? " + health check" : ""}</span><span>${r.est ? "estimated" : "from history"}</span></div>
+    <div class="r"><span>Start</span><span class="mono">${fmtAt(r.start)}</span></div>
+    <div class="r"><span>End</span><span class="mono">${fmtAt(r.end)}</span></div>
+    <div class="r"><span>Duration</span><span class="mono">${dur(r.end - r.start)}</span></div>
+    <div class="r"><span>Slots used</span><span class="mono">${tasksFor(job, repo && repo.maxTasks)}${repo && repo.maxTasks ? ` of ${repo.maxTasks}` : ""}</span></div>
+    ${r.src ? `<div class="r"><span>Triggered by</span><span>${esc(nm(jobById(r.src)))}</span></div>` : ""}
+    ${warn.map(w => `<div class="w">${esc(w)}</div>`).join("")}
+    ${!bar.classList.contains("nodrag") ? `<div style="opacity:.6;margin-top:4px">Drag sideways to move the start time</div>` : ""}`;
+  tip.hidden = false;
+  const x = Math.min(window.innerWidth - tip.offsetWidth - 12, e.clientX + 14), y = Math.min(window.innerHeight - tip.offsetHeight - 12, e.clientY + 14);
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+});
+tl.addEventListener("pointerleave", () => { tip.hidden = true; });
+
+// dragging a bar shifts the job's start time (snaps to 15 minutes)
+let dragState = null;
+tl.addEventListener("pointerdown", e => {
+  const bar = e.target.closest(".bar"); if (!bar || e.button !== 0) return;
+  const job = jobById(bar.dataset.job);
+  dragState = { x0: e.clientX, job, bars: [...tl.querySelectorAll(`.bar[data-job="${CSS.escape(job.id)}"]`)], moved: false, can: !bar.classList.contains("nodrag"), runId: +bar.dataset.run, pid: e.pointerId };
+  if (dragState.can) bar.setPointerCapture(e.pointerId);
+});
+tl.addEventListener("pointermove", e => {
+  if (!dragState || !dragState.can) return;
+  const dx = e.clientX - dragState.x0;
+  if (Math.abs(dx) > 4) dragState.moved = true;
+  if (!dragState.moved) return;
+  const px = S.settings.pxh / 60, snap = Math.round(dx / px / 15) * 15;
+  dragState.snap = snap;
+  dragState.bars.forEach(b => { b.style.transform = `translateX(${snap * px}px)`; b.classList.add("dragging"); });
+  tip.hidden = false;
+  const r = S.sim.all.find(x => x.id === dragState.runId);
+  tip.innerHTML = `<b>${esc(nm(dragState.job))}</b><div class="r"><span>New start</span><span class="mono">${hhmm(r.start + snap)}</span></div><div class="r"><span>Shift</span><span class="mono">${snap >= 0 ? "+" : "−"}${dur(Math.abs(snap))}</span></div>`;
+  tip.style.left = Math.min(window.innerWidth - 200, e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
+});
+const endDrag = () => {
+  if (!dragState) return;
+  const ds = dragState;
+  setTimeout(() => { dragState = null; }, 0);
+  tip.hidden = true;
+  if (!ds.moved) { selectJob(ds.job.id); return; }
+  if (!ds.can || !ds.snap) { renderTimeline(); return; }
+  shiftJob(ds.job, ds.snap);
+  S.sel = ds.job.id;
+  render();
+};
+tl.addEventListener("pointerup", endDrag);
+tl.addEventListener("pointercancel", () => { if (dragState) { dragState = null; renderTimeline(); } });
+
+function shiftJob(job, delta) {
+  const sc = job.schedule;
+  if (sc.type === "periodic") { sc.periodic.offsetMinutes = (((+(sc.periodic.offsetMinutes || 0) + delta) % 1440) + 1440) % 1440; return; }
+  if (sc.type === "monthly") { sc.monthly = sc.monthly || {}; const t = parseHM(sc.monthly.time || sc.time) + delta; sc.monthly.time = hhmm(t); return; }
+  const t = parseHM(sc.time) + delta, shift = Math.floor(t / 1440);
+  sc.time = hhmm(t);
+  if (shift && sc.days) sc.days = DAYS.filter(d => sc.days.includes(DAYS[(DAYS.indexOf(d) - shift + 70) % 7]));
+}
+
+// controls
+$("#startDate").addEventListener("change", e => { if (e.target.value) { S.settings.start = e.target.value; render(); } });
+$("#horizon").addEventListener("change", e => { S.settings.horizon = +e.target.value; render(); });
+document.querySelectorAll("[data-est]").forEach(b => b.addEventListener("click", () => { S.settings.est = b.dataset.est; document.querySelectorAll("[data-est]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); render(); }));
+function setView(v) { S.settings.view = v; document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.view === v))); renderTimeline(); }
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+document.querySelectorAll("[data-grp]").forEach(b => b.addEventListener("click", () => { S.settings.group = b.dataset.grp; function setView(v) { S.settings.view = v; document.querySelectorAll("[data-view]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.view === v))); renderTimeline(); }
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+document.querySelectorAll("[data-grp]").forEach(x => x.setAttribute("aria-pressed", String(x === b))); renderTimeline(); }));
+document.querySelectorAll("[data-zoom]").forEach(b => b.addEventListener("click", () => {
+  const old = S.settings.pxh, mid = (tl.scrollLeft + tl.clientWidth / 2 - LABW) / old;
+  S.settings.pxh = +b.dataset.zoom; document.querySelectorAll("[data-zoom]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+  renderTimeline(); tl.scrollLeft = Math.max(0, mid * S.settings.pxh - tl.clientWidth / 2 + LABW);
+}));
+$("#anon").addEventListener("change", e => { S.settings.anon = e.target.checked; buildAnon(); render(); });
+$("#showOff").addEventListener("change", e => { S.settings.showOff = e.target.checked; renderTimeline(); });
+
+// loading data
+function showError(msg) { const b = $("#banner"); b.textContent = msg; b.hidden = !msg; }
+function load(data, isSample) {
+  if (!data || typeof data !== "object" || !String(data.schema || "").startsWith("nightshift/") || !Array.isArray(data.jobs)) {
+    showError("That file isn't a Nightshift export. Run Collect-NightshiftData.ps1 on your VBR server and open the JSON it writes.");
+    return;
+  }
+  showError("");
+  data.repositories = data.repositories || []; data.proxies = data.proxies || []; data.hosts = data.hosts || []; data.activity = data.activity || [];
+  data.repositories.forEach(r => { if (Array.isArray(r.extents)) r.extents = r.extents.map(e => typeof e === "string" ? { name: e } : e); });
+  data.jobs.forEach(j => { j.schedule = j.schedule || { type: "none" }; j.fulls = j.fulls || {}; j.healthCheck = j.healthCheck || { enabled: false }; });
+  S.data = data; S.orig = clone(data); S.isSample = !!isSample; S.sel = null; S.selConf = null; S.selRepo = null; S.selHost = null;
+  buildAnon();
+  render();
+  // open on the first evening so the backup window is in view
+  requestAnimationFrame(() => { tl.scrollLeft = Math.max(0, (17 * 60) * S.settings.pxh / 60); });
+}
+$("#btnOpen").addEventListener("click", () => $("#file").click());
+$("#file").addEventListener("change", e => readFile(e.target.files[0]));
+$("#btnSample").addEventListener("click", () => load(JSON.parse($("#sample-data").textContent), true));
+function readFile(f) {
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { load(JSON.parse(r.result), false); } catch (err) { showError("Couldn't read that file as JSON. " + err.message); } };
+  r.readAsText(f);
+}
+let dragDepth = 0;
+window.addEventListener("dragenter", e => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { dragDepth++; $("#drop").hidden = false; } });
+window.addEventListener("dragleave", () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $("#drop").hidden = true; });
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => { e.preventDefault(); dragDepth = 0; $("#drop").hidden = true; readFile(e.dataTransfer.files[0]); });
+
+// boot: start on the Monday of the current week
+const now = new Date();
+const mon = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() + 6) % 7));
+S.settings.start = mon.toISOString().slice(0, 10);
+$("#startDate").value = S.settings.start;
+load(JSON.parse($("#sample-data").textContent), true);
+window.__nightshift = S; // for debugging and tests
+})();
+</script>

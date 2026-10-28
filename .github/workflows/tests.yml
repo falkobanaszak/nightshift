@@ -1,0 +1,52 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  collector:
+    name: Collector (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run collector tests in PowerShell 7
+        shell: pwsh
+        run: ./tests/Test-Collector.ps1
+      - name: Parse collector in Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD\collector\Collect-NightshiftData.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }
+          Write-Host 'Parses cleanly in Windows PowerShell 5.1'
+
+  viewer:
+    name: Viewer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and check that dist and docs are up to date
+        run: |
+          python viewer/build.py
+          git diff --exit-code -- dist/nightshift.html docs/index.html || (echo "Run python viewer/build.py and commit the result" && exit 1)
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Exercise the viewer
+        run: python tests/viewer_test.py
+      - name: Load collector exports in the viewer
+        shell: bash
+        run: |
+          pwsh -NoProfile -File tests/Test-Collector.ps1
+          python tests/load_exports.py
