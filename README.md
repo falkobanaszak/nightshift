@@ -6,7 +6,7 @@
 
 > Community project. Not made, endorsed or supported by Veeam Software.
 
-**[Try the live demo](https://YOUR-GITHUB-USER.github.io/nightshift/)** with sample data, nothing to install.
+   **[Try the live demo](https://falkobanaszak.github.io/nightshift/)** with sample data, nothing to install.
 
 ## Why
 
